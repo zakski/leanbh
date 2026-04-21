@@ -34,7 +34,7 @@ private[net] object PercentEncoder {
 
   private val encodedChar = ".*?%[\\dA-F]{2}.*".r
 
-  private def shouldEncode(ch: Char): Boolean = !unencodeable.matches(ch)
+  private def shouldEncode(ch: Char): Boolean = !unencodeable.matches(ch.toString)
 
   private def encode(ch: Char): String = "%" + "%04X".format(ch.toInt).substring(2)
 

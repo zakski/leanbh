@@ -11,7 +11,7 @@ object LevenshteinDistance {
     * @param second - the second CharSequence to check, must not be null
     * @throws IllegalArgumentException if either String input { @code null}
     */
-  def difference(first: CharSequence, second: CharSequence): Float = {
+  def difference(first: CharSequence, second: CharSequence): Int = {
     if (first == null || second == null) {
       throw new IllegalArgumentException("Arguments must not be null")
 

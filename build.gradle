@@ -17,6 +17,7 @@ apply plugin: 'idea'
         seleniumVersion = '4.41.0'
         jsoupVersion = '1.22.1'
         commonsLang3Version = '3.20.0'
+        superCsvVersion = '2.4.0'
     }
 
 

@@ -32,7 +32,7 @@ object FileFinder {
     * @return an array of found files.
     */
   private def searchRecursively(dir: File, filter: FilenameFilter): Array[File] = {
-    dir.listFiles(filter).flatMap(file => if (file.isDirectory) searchRecursively(file, filter) else List(file))
+    dir.listFiles(filter).flatMap(file => if (file.isDirectory) searchRecursively(file, filter) else Array(file))
   }
 
   /**

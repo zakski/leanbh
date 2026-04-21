@@ -11,6 +11,11 @@ java {
 
 dependencies {
     implementation group: 'org.scala-lang', name: 'scala-library', version: rootProject.ext.scalaVersion
+    implementation group: 'org.scala-lang', name: 'scala-compiler', version: rootProject.ext.scalaVersion
+    implementation group: 'net.sf.supercsv', name: 'super-csv', version: rootProject.ext.superCsvVersion
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: rootProject.ext.slf4jVersion
+    runtimeOnly group: 'org.slf4j', name: 'slf4j-reload4j', version: rootProject.ext.slf4jVersion
+
     testImplementation group: 'org.scalatest', name: "scalatest_${rootProject.ext.scalaBinaryVersion}", version: rootProject.ext.scalaTestVersion
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: rootProject.ext.junitVersion
 }

@@ -54,7 +54,7 @@ object FWriter {
   */
 case class FWriter(path: String, append: Boolean, encoding: String = "UTF-8") extends BufferedWriter(FWriter.init(path, encoding, append)) {
 
-  def writeLine(line: String) {
+  def writeLine(line: String): Unit = {
     this.write(line + Properties.lineSeparator)
   }
 }
