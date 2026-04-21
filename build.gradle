@@ -1,3 +1,6 @@
+import groovy.json.JsonSlurper
+import java.util.Locale
+
 // Equivalent to groupid and version in maven, artifactid equivalent is set in settings.gradle.
 group 'com.szadowsz'
 version '0.1.0'
@@ -12,6 +15,8 @@ apply plugin: 'idea'
         slf4jVersion = '2.0.17'
         junitVersion = '6.0.1'
         seleniumVersion = '4.41.0'
+        jsoupVersion = '1.22.1'
+        commonsLang3Version = '3.20.0'
     }
 
 
@@ -31,4 +36,140 @@ allprojects {
 wrapper {
     gradleVersion = '9.4.1'
     distributionType = Wrapper.DistributionType.BIN
+}
+
+tasks.register('downloadChromeDriver') {
+    group = 'automation'
+    description = 'Download matching ChromeDriver for local OS and Chrome version.'
+
+    doLast {
+        def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        def arch = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+
+        def platform
+        if (osName.contains('win')) {
+            platform = arch.contains('64') ? 'win64' : 'win32'
+        } else if (osName.contains('mac')) {
+            platform = (arch.contains('aarch64') || arch.contains('arm64')) ? 'mac-arm64' : 'mac-x64'
+        } else if (osName.contains('linux')) {
+            platform = 'linux64'
+        } else {
+            throw new GradleException("Unsupported OS '${osName}'")
+        }
+        logger.lifecycle("Platform: ${platform}")
+
+        def commandCandidates = []
+        def chromeBinaryOverride = project.findProperty('chromeBinary')?.toString()
+        if (chromeBinaryOverride) {
+            commandCandidates << [chromeBinaryOverride, '--version']
+        }
+
+        if (osName.contains('mac')) {
+            commandCandidates += [
+                ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '--version'],
+                ['/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', '--version'],
+            ]
+        } else if (osName.contains('linux')) {
+            commandCandidates += [
+                ['google-chrome', '--version'],
+                ['google-chrome-stable', '--version'],
+                ['chromium-browser', '--version'],
+                ['chromium', '--version'],
+            ]
+        } else if (osName.contains('win')) {
+            commandCandidates += [[
+                'powershell',
+                '-NoProfile',
+                '-Command',
+                "\$paths=@('$env:ProgramFiles\\Google\\Chrome\\Application\\chrome.exe','$env:ProgramFiles(x86)\\Google\\Chrome\\Application\\chrome.exe'); foreach(\$p in \$paths){ if(Test-Path \$p){ & \$p --version; break } }"
+            ]]
+        }
+
+        def chromeVersion = null
+        commandCandidates.each { candidate ->
+            try {
+                def process = new ProcessBuilder(candidate as String[])
+                    .redirectErrorStream(true)
+                    .start()
+                def text = process.inputStream.getText('UTF-8')
+                process.waitFor()
+                def matcher = text =~ /(\d+\.\d+\.\d+\.\d+)/
+                if (matcher.find()) {
+                    chromeVersion = matcher.group(1)
+                }
+            } catch (Exception ignored) {
+                // try the next candidate
+            }
+        }
+
+        if (chromeVersion == null) {
+            throw new GradleException("Could not determine local Chrome version. Install Chrome, put it on PATH, or pass -PchromeBinary=/path/to/chrome.")
+        }
+
+        def parts = chromeVersion.tokenize('.')
+        if (parts.size() < 3) {
+            throw new GradleException("Unexpected Chrome version format: ${chromeVersion}")
+        }
+        def buildKey = "${parts[0]}.${parts[1]}.${parts[2]}"
+        def milestone = parts[0]
+
+        def slurper = new JsonSlurper()
+        def patchUrl = 'https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json'
+        def milestoneUrl = 'https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json'
+
+        def patchData = slurper.parse(new URL(patchUrl))
+        def resolved = patchData.builds[buildKey]
+        if (resolved == null) {
+            def milestoneData = slurper.parse(new URL(milestoneUrl))
+            resolved = milestoneData.milestones[milestone]
+        }
+        if (resolved == null) {
+            throw new GradleException("No ChromeDriver found for Chrome ${chromeVersion} (build ${buildKey}).")
+        }
+
+        def download = resolved?.downloads?.chromedriver?.find { it.platform == platform }
+        if (download == null) {
+            throw new GradleException("No ChromeDriver download found for platform '${platform}' and Chrome ${chromeVersion}.")
+        }
+
+        def targetDir = project.file("chromedriver_${platform.replace('-', '_')}")
+        def tempDir = project.file("${project.buildDir}/chromedriver-temp/${platform}")
+        def zipFile = project.file("${project.buildDir}/chromedriver-temp/chromedriver-${platform}.zip")
+
+        project.delete(tempDir, targetDir)
+        tempDir.mkdirs()
+        zipFile.parentFile.mkdirs()
+
+        logger.lifecycle("Chrome version: ${chromeVersion}")
+        logger.lifecycle("Resolved ChromeDriver: ${resolved.version} (${platform})")
+        logger.lifecycle("Downloading from: ${download.url}")
+
+        new URL(download.url).withInputStream { input ->
+            zipFile.withOutputStream { output -> output << input }
+        }
+
+        project.copy {
+            from project.zipTree(zipFile)
+            into tempDir
+        }
+
+        def extractedRoot = tempDir.listFiles()?.find { it.isDirectory() }
+        if (extractedRoot == null) {
+            throw new GradleException("Could not locate extracted ChromeDriver files in ${tempDir}")
+        }
+
+        project.copy {
+            from extractedRoot
+            into targetDir
+        }
+
+        if (!osName.contains('win')) {
+            def executable = new File(targetDir, 'chromedriver')
+            if (executable.exists()) {
+                executable.setExecutable(true)
+            }
+        }
+
+        logger.lifecycle("ChromeDriver extracted to: ${targetDir}")
+    }
 }

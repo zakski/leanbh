@@ -1,9 +1,27 @@
 plugins {
     id 'java-library'
+    id 'scala'
 }
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
+}
+
+dependencies {
+    implementation project(':phobail')
+    implementation group: 'org.scala-lang', name: 'scala-library', version: rootProject.ext.scalaVersion
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: rootProject.ext.slf4jVersion
+    implementation group: 'org.seleniumhq.selenium', name: 'htmlunit3-driver', version: rootProject.ext.seleniumVersion
+    implementation group: 'org.seleniumhq.selenium', name: 'selenium-chrome-driver', version: rootProject.ext.seleniumVersion
+    implementation group: 'org.jsoup', name: 'jsoup', version: rootProject.ext.jsoupVersion
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: rootProject.ext.commonsLang3Version
+
+    testImplementation group: 'org.scalatest', name: "scalatest_${rootProject.ext.scalaBinaryVersion}", version: rootProject.ext.scalaTestVersion
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: rootProject.ext.junitVersion
+}
+
+test {
+    useJUnitPlatform()
 }
