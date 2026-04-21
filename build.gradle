@@ -5,10 +5,6 @@ version '0.1.0'
 // IntelliJ is the primary development medium, so it makes sense to add explicit support for it in gradle
 apply plugin: 'idea'
 
-// Add necessary language support
-apply plugin: 'java'
-apply plugin: 'scala'
-
     ext {
         scalaVersion = '2.13.17'
         scalaBinaryVersion = '2.13'
@@ -26,33 +22,10 @@ apply plugin: 'scala'
         }
     }
 
-repositories {
-    mavenCentral()
-    maven {
-        url 'http://dl.bintray.com/zakski/default'
-        allowInsecureProtocol = true
+allprojects {
+    repositories {
+        mavenCentral()
     }
-}
-
-
-/*
- * Dependencies of the current system. Important dependencies for interops between scala and java are: scala compiler,
- * slf4j logger, scalatest and junit.
- */
-dependencies {
-    implementation group: 'com.szadowsz', name: 'an-phobail', version: '0.0.1'
-    implementation group: 'com.szadowsz', name: 'maeve', version: '0.0.1'
-    implementation group: 'org.scala-lang', name: 'scala-library', version: scalaVersion
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
-
-    testImplementation group: 'org.seleniumhq.selenium', name: 'selenium-chrome-driver', version: seleniumVersion
-
-    testImplementation group: 'org.scalatest', name: "scalatest_${scalaBinaryVersion}", version: scalaTestVersion
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: junitVersion
-}
-
-test {
-    useJUnitPlatform()
 }
 
 wrapper {

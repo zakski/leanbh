@@ -6,11 +6,6 @@
 # Do not add user-specific Gradle data and configuration
 .gradle/
 
-# Track Gradle wrapper scripts and config
-!gradlew
-!gradlew.bat
-!gradle/wrapper/**
-
 # Do not add local builds to git
 build/
 /data/

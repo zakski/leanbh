@@ -1,0 +1,25 @@
+plugins {
+    id 'java-library'
+    id 'scala'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+dependencies {
+    implementation project(':phobail')
+    implementation project(':maeve')
+    implementation group: 'org.scala-lang', name: 'scala-library', version: rootProject.ext.scalaVersion
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: rootProject.ext.slf4jVersion
+
+    testImplementation group: 'org.seleniumhq.selenium', name: 'selenium-chrome-driver', version: rootProject.ext.seleniumVersion
+    testImplementation group: 'org.scalatest', name: "scalatest_${rootProject.ext.scalaBinaryVersion}", version: rootProject.ext.scalaTestVersion
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: rootProject.ext.junitVersion
+}
+
+test {
+    useJUnitPlatform()
+}
