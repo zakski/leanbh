@@ -33,7 +33,7 @@ private[maeve] trait DataExtractor[P <: Any] {
     * @param inst the current maeve instruction.
     * @param page the webpage in whatever format is being provided.
     */
-  def extract(queryUrl: Uri, returnedUrl: Uri, inst : MaeveInstruction[_], page : P)
+  def extract(queryUrl: Uri, returnedUrl: Uri, inst : MaeveInstruction[_], page : P): Unit
 
   /**
     * Function to check if retrieval is finished for the current page.

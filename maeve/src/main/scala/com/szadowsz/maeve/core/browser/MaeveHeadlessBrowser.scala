@@ -15,8 +15,8 @@
 // limitations under the License.
 package com.szadowsz.maeve.core.browser
 
-import com.gargoylesoftware.htmlunit._
-import com.gargoylesoftware.htmlunit.html.HtmlPage
+import org.htmlunit._
+import org.htmlunit.html.HtmlPage
 import org.openqa.selenium.htmlunit.HtmlUnitDriver
 import org.w3c.{dom => w3c}
 
@@ -39,14 +39,14 @@ class MaeveHeadlessBrowser(private val conf: MaeveConf) extends HtmlUnitDriver(c
     opt.setRedirectEnabled(conf.isRedirectEnabled)
     opt.setJavaScriptEnabled(conf.isJavascriptEnabled)
     opt.setCssEnabled(conf.isCssEnabled)
-    opt.setAppletEnabled(conf.isAppletEnabled)
+    //opt.setAppletEnabled(conf.isAppletEnabled) // use 3.11.0 or earlier for this
     opt.setPopupBlockerEnabled(conf.isPopupBlockerEnabled)
     opt.setGeolocationEnabled(conf.isGeolocationEnabled)
     opt.setDoNotTrackEnabled(conf.isDoNotTrackEnabled)
     opt.setThrowExceptionOnFailingStatusCode(conf.isThrowExceptionOnFailingStatusCode)
     opt.setPrintContentOnFailingStatusCode(conf.isPrintContentOnFailingStatusCode)
     opt.setThrowExceptionOnScriptError(conf.isThrowExceptionOnScriptError)
-    opt.setActiveXNative(conf.isActiveXNative)
+    //opt.setActiveXNative(conf.isActiveXNative) // use 3.11.0 or earlier for this
 
     if (conf.isJavascriptEnabled){
       client.setAjaxController(new NicelyResynchronizingAjaxController())
@@ -67,21 +67,21 @@ class MaeveHeadlessBrowser(private val conf: MaeveConf) extends HtmlUnitDriver(c
     *
     * @return the window the driver is using.
     */
-  def getWindow: WebWindow = getCurrentWindow
+  def getWindow: WebWindow = getCurrentWindow.getWebWindow
 
   /**
     * Get the currently accessed page.
     *
     * @return An abstract page that represents some content returned from a server.
     */
-  def getPage: Page = getCurrentWindow.getEnclosedPage
+  def getPage: Page = getCurrentWindow.getWebWindow.getEnclosedPage
 
   /**
     * Get the currently accessed web page.
     *
     * @return A representation of an HTML page returned from a server.
     */
-  override def getPageAsHtml: HtmlPage = getCurrentWindow.getEnclosedPage.asInstanceOf[HtmlPage]
+  override def getPageAsHtml: HtmlPage = getPage.asInstanceOf[HtmlPage]
 
   /**
     * Get the currently accessed web page as Jsoup Document.

@@ -17,11 +17,12 @@ package com.szadowsz.maeve.gglegrp.actions
 
 import java.util.Random
 import java.util.concurrent.TimeUnit
-
 import com.szadowsz.maeve.core.browser.MaeveBrowser
 import com.szadowsz.maeve.core.instruction.actions.ActionExecutor
 import com.szadowsz.common.net.Uri
 import org.openqa.selenium.By
+
+import java.time.Duration
 
 /**
   * General Purpose Executor for accessing google. Signs into google as a first action.
@@ -33,7 +34,7 @@ class GgleExecutor(private val username: String,private val password: String) ex
     val rand = new Random()
     val loginURI = Uri("https://accounts.google.com/ServiceLogin?hl=en&passive=true").appendQuery("continue", firstTarget.toString)
     browser.get(loginURI)
-    browser.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS)
+    browser.manage().timeouts().implicitlyWait(Duration.ofSeconds(30))
     browser.findElement(By.id("Email")).sendKeys(username)
     Thread.sleep(1000 + rand.nextInt(4)*1000)
     browser.findElement(By.id("next")).click()

@@ -1,6 +1,6 @@
 package com.szadowsz.babby.target.web.meanOfNames
 
-import com.gargoylesoftware.htmlunit.html.{DomAttr, HtmlElement, HtmlPage}
+import org.htmlunit.html.{DomAttr, HtmlElement, HtmlPage}
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor

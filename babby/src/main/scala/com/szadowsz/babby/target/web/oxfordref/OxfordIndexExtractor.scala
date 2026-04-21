@@ -1,6 +1,6 @@
 package com.szadowsz.babby.target.web.oxfordref
 
-import com.gargoylesoftware.htmlunit.html.{DomAttr, DomElement, HtmlPage}
+import org.htmlunit.html.{DomAttr, DomElement, HtmlPage}
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.{HtmlExtractor, JsoupExtractor}

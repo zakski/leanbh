@@ -1,6 +1,6 @@
 package com.szadowsz.maeve.core.instruction.extractor
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage
+import org.htmlunit.html.HtmlPage
 
 /**
   * Base trait for extraction of Data from a HtmlUnit Webpage.

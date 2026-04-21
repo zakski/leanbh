@@ -1,6 +1,6 @@
 package com.szadowsz.babby.target.web.bcenter
 
-import com.gargoylesoftware.htmlunit.html.{HtmlElement, HtmlPage}
+import org.htmlunit.html.{HtmlElement, HtmlPage}
 import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction

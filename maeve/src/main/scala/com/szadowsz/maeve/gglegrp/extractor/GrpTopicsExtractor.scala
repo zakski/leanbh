@@ -15,21 +15,17 @@
 // limitations under the License.
 package com.szadowsz.maeve.gglegrp.extractor
 
-import java.text.SimpleDateFormat
-import java.util.Calendar
-
+import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
 import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
-import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.util.JsoupHtmlToPlainText
-import org.apache.commons.lang3.StringEscapeUtils
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document.OutputSettings
 import org.jsoup.nodes.{Document, Element}
-import org.jsoup.safety.Whitelist
 import org.slf4j.LoggerFactory
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}

@@ -24,15 +24,15 @@ import org.openqa.selenium.WebDriverException
   */
 class MaeveException(message: String, cause: Throwable) extends WebDriverException(message, cause) {
 
-  def this() {
+  def this() = {
     this(null, null)
   }
 
-  def this(message: String) {
+  def this(message: String) = {
     this(message, null)
   }
 
-  def this(cause: Throwable) {
+  def this(cause: Throwable) = {
     this(cause.toString, cause)
   }
 }

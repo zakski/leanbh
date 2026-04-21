@@ -38,8 +38,7 @@ object JsoupHtmlToPlainText {
     */
   def convertToPlainText(element : Element,maxWidth : Int = terminalLength): String = {
     val formatter = FormattingVisitor(maxWidth)
-    val traversor = new NodeTraversor(formatter)
-    traversor.traverse(element) // walk the DOM, and call .head() and .tail() for each node
+    NodeTraversor.traverse(formatter,element) // walk the DOM, and call .head() and .tail() for each node
     formatter.toString()
   }
 
@@ -54,7 +53,7 @@ object JsoupHtmlToPlainText {
       * @param node the element we are examining.
       * @param depth current depth (not used).
       */
-    override def head(node : Node, depth : Int) {
+    override def head(node : Node, depth : Int): Unit = {
       val name = node.nodeName()
       if (node.isInstanceOf[TextNode]) {
         append(node.asInstanceOf[TextNode].text()); // TextNodes carry all user-readable text in the DOM.

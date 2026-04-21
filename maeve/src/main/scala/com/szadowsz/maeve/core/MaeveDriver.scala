@@ -16,7 +16,6 @@
 package com.szadowsz.maeve.core
 
 import java.util.concurrent.TimeUnit
-
 import org.openqa.selenium.Proxy
 import com.szadowsz.maeve.core.browser.{MaeveBrowser, MaeveConf, MaeveHeadlessBrowser, MaeveRemoteBrowser}
 import com.szadowsz.maeve.core.error.InvalidProxyException
@@ -25,6 +24,7 @@ import com.szadowsz.maeve.core.instruction.target.single.SingleTarget
 import com.szadowsz.maeve.core.util.recovery.RecoveryUtil
 import org.slf4j.LoggerFactory
 
+import java.time.Duration
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -162,7 +162,7 @@ class MaeveDriver(config: MaeveConf) {
 
   def scrapeUsingInstruction(instruction: MaeveInstruction[_]):Unit = {
     feedInstruction(instruction)
-    if (instruction.hasTimeouts) {browser.manage().timeouts().pageLoadTimeout(15,TimeUnit.SECONDS)}
+    if (instruction.hasTimeouts) {browser.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(15))}
     scrapeUsingCurrInstruction()
   }
 }

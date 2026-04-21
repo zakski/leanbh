@@ -1,6 +1,6 @@
 package com.szadowsz.babby.target.web.behindthename
 
-import com.gargoylesoftware.htmlunit.html.{HtmlElement, HtmlPage}
+import org.htmlunit.html.{HtmlElement, HtmlPage}
 import com.szadowsz.babby.data.gender.GenderUtil
 import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri

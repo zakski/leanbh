@@ -15,7 +15,7 @@
 // limitations under the License.
 package com.szadowsz.maeve.core.browser
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage
+import org.htmlunit.html.HtmlPage
 import com.szadowsz.common.net.Uri
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document

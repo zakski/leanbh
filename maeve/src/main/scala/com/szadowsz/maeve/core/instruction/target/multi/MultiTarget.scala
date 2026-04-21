@@ -18,6 +18,8 @@ package com.szadowsz.maeve.core.instruction.target.multi
 import com.szadowsz.maeve.core.instruction.target.Target
 import com.szadowsz.common.net.Uri
 
+import scala.collection.Seq
+
 /**
   * Trait for the common scenario in which we need to construct and target multiple uris from some provided sequence.
   *
