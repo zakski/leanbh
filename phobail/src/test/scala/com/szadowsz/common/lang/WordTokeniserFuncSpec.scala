@@ -15,18 +15,16 @@
 // limitations under the License.
 package com.szadowsz.common.lang
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FunSpec, Matchers}
 import org.scalatest.LoneElement._
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 /**
   * Simple Unit Tests for the word tokeniser.
   *
   * Created on 28/07/2016.
   */
-@RunWith(classOf[JUnitRunner])
-class WordTokeniserFuncSpec extends FunSpec with Matchers {
+class WordTokeniserFuncSpec extends AnyFunSpec with Matchers {
 
   describe("Tokenisation Function"){
 

@@ -15,17 +15,15 @@
 // limitations under the License.
 package com.szadowsz.common.lang
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FunSpec, Matchers}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 /**
   * Simple Unit Tests for the word formatter.
   *
   * Created on 28/07/2016.
   */
-@RunWith(classOf[JUnitRunner])
-class WordFormatterFuncSpec extends FunSpec with Matchers {
+class WordFormatterFuncSpec extends AnyFunSpec with Matchers {
 
   describe("Capitalisation Function"){
 

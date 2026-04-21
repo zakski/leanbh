@@ -15,7 +15,10 @@
 // limitations under the License.
 package com.szadowsz.common.net
 
-class UriFlatSpec extends FlatSpec with Matchers {
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+class UriFlatSpec extends AnyFlatSpec with Matchers {
 
   behavior of "Uri"
 
