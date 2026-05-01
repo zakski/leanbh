@@ -1,14 +1,13 @@
 package com.szadowsz.babby.target.census.ire
 
-import org.htmlunit.html.{DomAttr, HtmlElement, HtmlPage}
-import com.szadowsz.common.io.write.{CsvWriter, FWriter}
+import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
-import com.szadowsz.maeve.core.instruction.extractor.{HtmlExtractor, JsoupExtractor}
+import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
 import org.jsoup.nodes.Document
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 07/11/2016.

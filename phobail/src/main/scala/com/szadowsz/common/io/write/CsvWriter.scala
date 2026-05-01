@@ -18,7 +18,7 @@ package com.szadowsz.common.io.write
 import org.supercsv.io.CsvListWriter
 import org.supercsv.prefs.CsvPreference
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 30/05/2016.

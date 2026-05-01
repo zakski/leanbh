@@ -15,10 +15,10 @@
 // limitations under the License.
 package com.szadowsz.maeve.core.browser
 
-import javax.xml.parsers.DocumentBuilderFactory
-
 import org.openqa.selenium.chrome.ChromeDriver
 import org.w3c.{dom => w3c}
+
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
   * This is an extension to the Chrome Driver to bring it under the Maeve Browser Umbrella. It basically provides the additional page options that we require

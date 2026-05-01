@@ -37,7 +37,7 @@ class MaeveHeadlessBrowser(private val conf: MaeveConf) extends HtmlUnitDriver(c
     val opt = client.getOptions
     opt.setUseInsecureSSL(conf.isUseInsecureSSL)
     opt.setRedirectEnabled(conf.isRedirectEnabled)
-    opt.setJavaScriptEnabled(conf.isJavascriptEnabled)
+    opt.setJavaScriptEnabled(conf.isJavaScriptEnabled)
     opt.setCssEnabled(conf.isCssEnabled)
     //opt.setAppletEnabled(conf.isAppletEnabled) // use 3.11.0 or earlier for this
     opt.setPopupBlockerEnabled(conf.isPopupBlockerEnabled)
@@ -48,7 +48,7 @@ class MaeveHeadlessBrowser(private val conf: MaeveConf) extends HtmlUnitDriver(c
     opt.setThrowExceptionOnScriptError(conf.isThrowExceptionOnScriptError)
     //opt.setActiveXNative(conf.isActiveXNative) // use 3.11.0 or earlier for this
 
-    if (conf.isJavascriptEnabled){
+    if (conf.isJavaScriptEnabled){
       client.setAjaxController(new NicelyResynchronizingAjaxController())
     }
 

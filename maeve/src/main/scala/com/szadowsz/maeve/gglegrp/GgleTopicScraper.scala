@@ -15,14 +15,14 @@
 // limitations under the License.
 package com.szadowsz.maeve.gglegrp
 
+import com.szadowsz.common.io.read.FReader
+import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.MaeveDriver
 import com.szadowsz.maeve.core.browser.MaeveConf
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.actions.WaitExecutor
 import com.szadowsz.maeve.core.instruction.target.multi.FragmentTarget
 import com.szadowsz.maeve.gglegrp.extractor.GrpTopicsExtractor
-import com.szadowsz.common.io.read.FReader
-import com.szadowsz.common.net.Uri
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
@@ -40,7 +40,7 @@ class GgleTopicScraper(private val link: String, private val dir: String, privat
   private val groupDir: String = dir + s"${group.replaceAll("\\.", "/")}/"
 
   def execute(): Unit = {
-    val conf = MaeveConf()
+    val conf = new MaeveConf()
     val scraper = new MaeveDriver(conf)
     recoveryDir.foreach(p => scraper.setRecoveryDirectory(p))
 
@@ -62,7 +62,7 @@ class GgleTopicScraper(private val link: String, private val dir: String, privat
     val filter = new GrpTopicsExtractor()
     val actions = new WaitExecutor(5000)
 
-    val instruction = MaeveInstruction(group, target, actions, filter, groupDir, false, !deltaMode, false, MaeveConf().setNoProxy())
+    val instruction = MaeveInstruction(group, target, actions, filter, groupDir, false, !deltaMode, false, new MaeveConf().setNoProxy())
 
     scraper.feedInstruction(instruction)
     scraper.scrapeUsingCurrInstruction()

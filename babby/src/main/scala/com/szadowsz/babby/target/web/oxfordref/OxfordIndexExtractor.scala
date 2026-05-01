@@ -1,13 +1,12 @@
 package com.szadowsz.babby.target.web.oxfordref
 
-import org.htmlunit.html.{DomAttr, DomElement, HtmlPage}
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
-import com.szadowsz.maeve.core.instruction.extractor.{HtmlExtractor, JsoupExtractor}
+import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
 import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
 import org.jsoup.nodes.{Document, Element}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 /**
