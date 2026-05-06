@@ -6,7 +6,7 @@ import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 01/11/2016.
@@ -23,7 +23,7 @@ class BCenterDataExtractor extends HtmlExtractor {
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
      val titleEl = page.getByXPath("//div[@class='mainContent']//h1[@itemprop='headline']").asInstanceOf[java.util.List[HtmlElement]].asScala.head
 
-    val title = titleEl.getFirstChild.asText().trim
+    val title = titleEl.getFirstChild.asNormalizedText().trim
     val gender = if (titleEl.getByXPath("./span[@class='bgGenderIconM genderIcon']").size() > 0){
       "m"
     }else if (titleEl.getByXPath("./span[@class='bgGenderIconF genderIcon']").size() > 0) {
@@ -38,7 +38,7 @@ class BCenterDataExtractor extends HtmlExtractor {
       .asInstanceOf[java.util.List[HtmlElement]].asScala.headOption
 
          val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
-        writer.write(title, gender,orgOpt.map(_.asText()).getOrElse(""),meanOpt.map(_.asText()).getOrElse(""))
+        writer.write(title, gender,orgOpt.map(_.asNormalizedText()).getOrElse(""),meanOpt.map(_.asNormalizedText()).getOrElse(""))
         writer.close()
   }
 

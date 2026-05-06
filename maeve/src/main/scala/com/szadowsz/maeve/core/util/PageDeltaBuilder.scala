@@ -15,7 +15,7 @@
 // limitations under the License.
 package com.szadowsz.maeve.core.util
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import org.jsoup.nodes.{Document, Element}
 import org.jsoup.parser.Tag
 

@@ -17,7 +17,7 @@ package com.szadowsz.common.io.zip
 
 import java.io.{BufferedOutputStream, File, FileInputStream, FileOutputStream}
 import java.util.zip.{ZipEntry, ZipFile, ZipOutputStream}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 29/10/2016.

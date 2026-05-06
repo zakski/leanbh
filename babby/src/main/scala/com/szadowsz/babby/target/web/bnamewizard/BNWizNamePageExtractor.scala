@@ -6,7 +6,7 @@ import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 /**
@@ -23,7 +23,7 @@ class BNWizNamePageExtractor extends HtmlExtractor with TxtFileLineWriter {
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
     val fileName = queryUrl.path.substring(queryUrl.path.lastIndexOf('/'))
-    val urls = page.getByXPath("//div[@id='namipedia-search-results']//li/a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
+    val urls = page.getByXPath[DomAttr]("//div[@id='namipedia-search-results']//li/a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
     write(inst.dPath, fileName, urls.toList, false)
   }
 

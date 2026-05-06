@@ -19,7 +19,7 @@ import com.szadowsz.maeve.core.browser.MaeveBrowser
 import org.openqa.selenium.{By, Keys}
 import org.openqa.selenium.interactions.Actions
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Scrapes each topic url, for smaller groups where we can make 1st pass to grab the topics and a 2nd pass to read their content. Does not work on large

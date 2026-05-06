@@ -22,7 +22,7 @@ import com.szadowsz.common.net.Uri
 import org.jsoup.nodes.Document
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 16/10/2016.

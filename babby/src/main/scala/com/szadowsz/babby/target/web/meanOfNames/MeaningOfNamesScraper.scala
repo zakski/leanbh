@@ -34,7 +34,7 @@ object MeaningOfNamesScraper {
 
   private val urlBase = Uri("http://www.meaning-of-names.com/names/")
   private val target = PathTarget(urlBase,('a' to 'z').toSeq.map(c => s"$c-names-1.asp"))
-  private val conf = MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
+  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
 
 
   def main(args : Array[String]): Unit = {

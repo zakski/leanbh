@@ -6,7 +6,7 @@ import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 /**
@@ -25,8 +25,8 @@ class MeaningOfNamesPageExtractor extends HtmlExtractor with TxtFileLineWriter {
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
     val fileName = queryUrl.path.substring(queryUrl.path.lastIndexOf('/')+1,queryUrl.path.lastIndexOf('/')+2)
-    val urls = page.getByXPath("//div[@class='brownwide0']//a/@href|//div[@class='brownwide1']//a/@href").asScala.toList.map{ case (url : DomAttr) =>
-      url.getValue}
+    val urls = page.getByXPath[DomAttr]("//div[@class='brownwide0']//a/@href|//div[@class='brownwide1']//a/@href")
+      .asScala.toList.map{ case (url : DomAttr) => url.getValue}
 
     write(inst.dPath, fileName, urls, true)
     isMore = page.getFirstByXPath("//a[text()='>']") != null

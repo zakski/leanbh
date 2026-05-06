@@ -6,7 +6,7 @@ import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Created on 01/11/2016.
@@ -24,10 +24,10 @@ class MeaningOFNamesDataExtractor extends HtmlExtractor {
     val titleEl = page.getByXPath("//div[@id='content-content']//div[@class='title clear-block']/h2/span").asInstanceOf[java.util.List[HtmlElement]].asScala
       .head
 
-    val title = titleEl.asText()
+    val title = titleEl.asNormalizedText()
     val gender = titleEl.getAttribute("class")
 
-    val pro = page.getByXPath("//div[@id='content-content']//div[@id='name-pronunciation']").asInstanceOf[java.util.List[HtmlElement]].asScala.head.asText()
+    val pro = page.getByXPath("//div[@id='content-content']//div[@id='name-pronunciation']").asInstanceOf[java.util.List[HtmlElement]].asScala.head.asNormalizedText()
       .replaceAll("Pronunciation:", "").trim
 
     val orgOpt = page.getByXPath("//div[@id='content-content']//div[@id='name-origin']/p").asInstanceOf[java.util.List[HtmlElement]].asScala.headOption
@@ -35,7 +35,7 @@ class MeaningOFNamesDataExtractor extends HtmlExtractor {
 
 
     val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
-    writer.write(title, gender, pro,orgOpt.map(_.asText()).getOrElse(""),varOpt.map(_.asText()).getOrElse(""))
+    writer.write(title, gender, pro,orgOpt.map(_.asNormalizedText()).getOrElse(""),varOpt.map(_.asNormalizedText()).getOrElse(""))
     writer.close()
   }
 

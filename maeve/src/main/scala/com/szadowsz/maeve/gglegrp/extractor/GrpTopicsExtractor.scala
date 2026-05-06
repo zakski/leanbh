@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 

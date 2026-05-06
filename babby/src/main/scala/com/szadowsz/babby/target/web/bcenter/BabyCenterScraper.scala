@@ -35,7 +35,7 @@ object BabyCenterScraper {
 
   private val urlBase = Uri("http://www.babycenter.com/babyNamerSearch.htm?name=*&batchSize=1000")
   private val target = QueryTarget(urlBase, "startIndex", (0 until 219000 by 1000).toSeq.map(_.toString))
-  private val conf = MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false).setHTTPProxy("proxy", 8080, Nil)
+  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false).setHTTPProxy("proxy", 8080, Nil)
   private val group = "babycenter"
 
   def main(args: Array[String]): Unit = {

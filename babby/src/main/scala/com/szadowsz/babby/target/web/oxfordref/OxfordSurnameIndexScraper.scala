@@ -21,7 +21,7 @@ object OxfordSurnameIndexScraper {
 
   private val urlBase = Uri("http://www.oxfordreference.com/view/10.1093/acref/9780199677764.001.0001/acref-9780199677764?pageSize=100")
   private val target = QueryTarget(urlBase, "page", (1 to 457).toSeq.map(_.toString))
-  private val conf = MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false).setHTTPProxy("proxy", 8080, Nil)
+  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false).setHTTPProxy("proxy", 8080, Nil)
   private val group = "oxfordsurnames"
 
   def main(args: Array[String]): Unit = {

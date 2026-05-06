@@ -35,7 +35,7 @@ object BehindTheNameSurScraper {
 
   private val urlBase = Uri("http://www.surname.behindthename.com/names/letter/")
   private val target = PathTarget(urlBase, ('a' to 'z').flatMap(c => (1 to 4).map(i => c+"/"+ i)))
-  private val conf = MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
+  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
 
 
   def main(args : Array[String]): Unit = {

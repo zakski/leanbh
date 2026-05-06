@@ -18,7 +18,7 @@ package com.szadowsz.common.io.read
 import org.supercsv.io.CsvListReader
 import org.supercsv.prefs.CsvPreference
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * Bundled csv file reader to simplify the reading of csvs.

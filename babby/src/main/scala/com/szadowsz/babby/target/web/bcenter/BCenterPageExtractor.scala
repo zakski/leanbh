@@ -6,7 +6,7 @@ import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 /**
@@ -22,7 +22,7 @@ class BCenterPageExtractor extends HtmlExtractor with TxtFileLineWriter {
     * @param page        the webpage in whatever format is being provided.
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
-    val urls = page.getByXPath("//div[@class='mainContent']//table/tbody//td[@class='nameCell']/a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
+    val urls = page.getByXPath[DomAttr]("//div[@class='mainContent']//table/tbody//td[@class='nameCell']/a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
     write(inst.dPath, inst.name, urls.toList, true)
   }
 
