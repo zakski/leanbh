@@ -15,10 +15,11 @@ apply plugin: 'idea'
         scalaTestPlusVersion = '3.2.20.0'
         slf4jVersion = '2.0.17'
         junitVersion = '6.0.1'
-        seleniumVersion = '4.41.0'
+        seleniumVersion = '4.43.0'
         jsoupVersion = '1.22.1'
         commonsLang3Version = '3.20.0'
         superCsvVersion = '2.4.0'
+        log4j2Version = '2.25.4'
     }
 
 

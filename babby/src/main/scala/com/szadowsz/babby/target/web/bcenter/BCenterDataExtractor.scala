@@ -21,25 +21,18 @@ class BCenterDataExtractor extends HtmlExtractor {
     * @param page        the webpage in whatever format is being provided.
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
-     val titleEl = page.getByXPath("//div[@class='mainContent']//h1[@itemprop='headline']").asInstanceOf[java.util.List[HtmlElement]].asScala.head
+    val titleEl = page.getByXPath("//main[contains(@class,'mobileMarginProvider')]//h1").asInstanceOf[java.util.List[HtmlElement]].asScala.head
+    val title = titleEl.asNormalizedText().trim
 
-    val title = titleEl.getFirstChild.asNormalizedText().trim
-    val gender = if (titleEl.getByXPath("./span[@class='bgGenderIconM genderIcon']").size() > 0){
-      "m"
-    }else if (titleEl.getByXPath("./span[@class='bgGenderIconF genderIcon']").size() > 0) {
-      "f"
-    } else {
-      throw new RuntimeException("Gender not found")
-    }
-    val meanOpt = page.getByXPath("//div[@class='mainContent']//div[@class='babyNameSubhead'][contains(text(),'What does')]/following-sibling::p[1]")
+    val meanOpt = page.getByXPath("//main[contains(@class,'mobileMarginProvider')]//div[@class='spacer200 stats']//div[contains(.,'Meaning')]")
       .asInstanceOf[java.util.List[HtmlElement]].asScala.headOption
 
-    val orgOpt = page.getByXPath("//div[@class='mainContent']//div[@class='babyNameSubhead'][text()='Origin']/following-sibling::p[1]")
+    val orgOpt = page.getByXPath("//main[contains(@class,'mobileMarginProvider')]//div[@class='spacer200 stats']//div[@class='labelAndText'][contains(.,'Origin')]")
       .asInstanceOf[java.util.List[HtmlElement]].asScala.headOption
 
-         val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
-        writer.write(title, gender,orgOpt.map(_.asNormalizedText()).getOrElse(""),meanOpt.map(_.asNormalizedText()).getOrElse(""))
-        writer.close()
+    val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
+    writer.write(title, "",orgOpt.map(_.asNormalizedText().replace("Origin:","").trim).getOrElse(""),meanOpt.map(_.asNormalizedText().replace("Meaning:","").trim).getOrElse(""))
+    writer.close()
   }
 
   /**

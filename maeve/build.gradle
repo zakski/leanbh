@@ -13,7 +13,6 @@ dependencies {
     // api: exposed to consumers' compile classpath (transitive from :maeve)
     api project(':phobail')
     api group: 'org.scala-lang', name: 'scala-library', version: rootProject.ext.scalaVersion
-    api group: 'org.slf4j', name: 'slf4j-api', version: rootProject.ext.slf4jVersion
     api group: 'org.seleniumhq.selenium', name: 'htmlunit3-driver', version: rootProject.ext.seleniumVersion
     api group: 'org.seleniumhq.selenium', name: 'selenium-chrome-driver', version: rootProject.ext.seleniumVersion
     api group: 'org.jsoup', name: 'jsoup', version: rootProject.ext.jsoupVersion

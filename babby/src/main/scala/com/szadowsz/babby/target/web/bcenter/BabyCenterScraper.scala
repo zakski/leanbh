@@ -33,9 +33,9 @@ import scala.collection.mutable.ArrayBuffer
 object BabyCenterScraper {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  private val urlBase = Uri("http://www.babycenter.com/babyNamerSearch.htm?name=*&batchSize=1000")
-  private val target = QueryTarget(urlBase, "startIndex", (0 until 219000 by 1000).toSeq.map(_.toString))
-  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false).setHTTPProxy("proxy", 8080, Nil)
+  private val urlBase = Uri("https://www.babycenter.com/baby-names/search/baby-name-generator")
+  private val target = QueryTarget(urlBase, "page", (1 to 599 by 1).toSeq.map(_.toString))
+  private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
   private val group = "babycenter"
 
   def main(args: Array[String]): Unit = {

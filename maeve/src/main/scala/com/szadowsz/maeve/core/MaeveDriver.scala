@@ -74,7 +74,7 @@ class MaeveDriver(config: MaeveConf) {
 
   def setRecoveryDirectory(path: String): Unit = recovPath = path
 
-  def feedInstruction(instruction: MaeveInstruction[_]) = {
+  def feedInstruction(instruction: MaeveInstruction[_]): Unit = {
     logger.info("Initialising Browser...")
     if (instruction.isHeadless) {
       browser = new MaeveHeadlessBrowser(instruction.overrideConf(defaultConf))

@@ -64,7 +64,10 @@ class MaeveConf extends HtmlUnitDriverOptions {
 
   def isThrowExceptionOnScriptError: Boolean = getCapability(HtmlUnitOptionNames.optThrowExceptionOnScriptError).asInstanceOf[Boolean]
 
-  def shouldSkipProxyTest: Boolean = Option(getCapability(MaeveConf.SKIP_TEST_PROXY).asInstanceOf[Boolean]).getOrElse(false)
+  def shouldSkipProxyTest: Boolean = {
+    val opt = Option(getCapability(MaeveConf.SKIP_TEST_PROXY)).map(_.asInstanceOf[Boolean])
+    opt.getOrElse(true)
+  }
 
   override def setJavaScriptEnabled(enableJavascript: Boolean): MaeveConf = super.setJavaScriptEnabled(enableJavascript).asInstanceOf[MaeveConf]
 

@@ -87,7 +87,7 @@ case class MaeveInstruction
 
   def isDone: Boolean = target.isDone
 
-  def extractData(browser: MaeveBrowser) = {
+  def extractData(browser: MaeveBrowser): Unit = {
     extractor match {
       case html: HtmlExtractor => html.extract(Uri(browser.getCurrentUrl), getCurrentUrl, this, browser.getPageAsHtml)
       case dom: DomExtractor => dom.extract(Uri(browser.getCurrentUrl), getCurrentUrl, this, browser.getPageAsDom)
