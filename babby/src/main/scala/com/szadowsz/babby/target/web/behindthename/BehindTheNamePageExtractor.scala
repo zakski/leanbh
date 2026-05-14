@@ -22,9 +22,9 @@ class BehindTheNamePageExtractor extends HtmlExtractor with TxtFileLineWriter {
     * @param page        the webpage in whatever format is being provided.
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
-    val fileName = queryUrl.path.substring(queryUrl.path.lastIndexOf('/')-1,queryUrl.path.lastIndexOf('/'))
-    val urls = page.getByXPath[DomAttr]("//table//div[@class='browsename']/b/a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
-    write(inst.dPath, fileName, urls.toList, true)
+    val fileName = returnedUrl.path.substring(returnedUrl.path.lastIndexOf('/')-1,returnedUrl.path.lastIndexOf('/'))
+    val urls = page.getByXPath[DomAttr]("//div[@id='body']//div[@class='browsename']//span[@class='listname']//a/@href").asScala.map{ case (url : DomAttr) => url.getValue}
+    write(inst.dPath, fileName, urls.toList, append = true)
   }
 
   /**

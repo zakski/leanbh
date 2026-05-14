@@ -15,17 +15,14 @@
 // limitations under the License.
 package com.szadowsz.babby.target.web.behindthename
 
-import java.io.File
-
 import com.szadowsz.common.io.explore.{ExtensionFilter, FileFinder}
 import com.szadowsz.common.io.read.FReader
-import com.szadowsz.common.io.zip.ZipperUtil
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.MaeveDriver
 import com.szadowsz.maeve.core.browser.MaeveConf
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
-import com.szadowsz.maeve.core.instruction.actions.{NopExecutor, WaitExecutor}
-import com.szadowsz.maeve.core.instruction.target.multi.{PathTarget, RelativeUriTarget}
+import com.szadowsz.maeve.core.instruction.actions.WaitExecutor
+import com.szadowsz.maeve.core.instruction.target.multi.PathTarget
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
@@ -47,7 +44,7 @@ object BehindTheNameFirstScraper {
     val filter = new BehindTheNamePageExtractor()
     val actions = new WaitExecutor(2000) // try not throttle the website
 
-    val instruction1 = MaeveInstruction("behindthenameFirst", target, actions, filter, "./data/web/behindthename/", true, true)
+    val instruction1 = MaeveInstruction("behindthenameFirst", target, actions, filter, "./data/web/behindthename/", isHeadless = true, recovEnabled = true)
 
 
     scraper.feedInstruction(instruction1)
@@ -55,7 +52,7 @@ object BehindTheNameFirstScraper {
 
     val urlFiles = FileFinder.search("./data/web/behindthename/", Option(new ExtensionFilter(".txt",false)))
 
-    val urls = urlFiles.flatMap { f =>
+    val urls = urlFiles.sortBy(_.getName).flatMap { f =>
       val read = new FReader(f.getAbsolutePath)
 
       val buff = ArrayBuffer[String]()
@@ -68,7 +65,7 @@ object BehindTheNameFirstScraper {
     }
     val target2 = PathTarget(Uri("http://www.behindthename.com/"),urls)
     val filter2 =  new BehindTheNameFirstDataExtractor
-    val instruction2 = MaeveInstruction("behindthenameFirstnames", target2, actions, filter2, "./data/web/behindthename/", true, true)
+    val instruction2 = MaeveInstruction("behindthenameFirstnames", target2, actions, filter2, "./data/web/behindthename/", isHeadless = true, recovEnabled = true)
 
     scraper.feedInstruction(instruction2)
     scraper.scrapeUsingCurrInstruction()
