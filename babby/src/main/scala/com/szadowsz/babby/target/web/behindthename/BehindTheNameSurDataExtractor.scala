@@ -1,18 +1,38 @@
 package com.szadowsz.babby.target.web.behindthename
 
-import org.htmlunit.html.{HtmlElement, HtmlPage}
+import org.htmlunit.html.{DomNode, DomText, HtmlAnchor, HtmlElement, HtmlPage, HtmlSpan}
 import com.szadowsz.babby.data.gender.GenderUtil
 import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
 
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 /**
   * Created on 01/11/2016.
   */
 class BehindTheNameSurDataExtractor extends HtmlExtractor {
+
+  private def convertToMap(varsList: Iterable[DomNode]): Map[String, List[String]] = {
+    val map = mutable.Map[String, List[String]]()
+    var sameOrigin = List[String]()
+    for (node <- varsList) {
+      node match {
+        case anchor: HtmlAnchor =>
+          sameOrigin = sameOrigin :+ anchor.asNormalizedText()
+        case span : HtmlSpan =>
+          map.put(span.asNormalizedText(), sameOrigin)
+          sameOrigin = List[String]()
+      }
+
+    }
+    if (sameOrigin.nonEmpty){
+      map.put("_", sameOrigin)
+    }
+    map.toMap
+  }
 
    /**
     * Generic method to extract data from a webpage.
@@ -23,27 +43,66 @@ class BehindTheNameSurDataExtractor extends HtmlExtractor {
     * @param page        the webpage in whatever format is being provided.
     */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
-    val titleEl = page.getFirstByXPath("//div[@class='body']//div[@class='namemain']").asInstanceOf[HtmlElement].asNormalizedText()
-    val title = titleEl.replaceAll("Given Name","").trim
+    val title = page.getFirstByXPath("//div[@id='body']//h1[@class='namebanner-title']").asInstanceOf[HtmlElement].asNormalizedText().trim
 
-    val source = page.getFirstByXPath("//div[@class='body']//div[@class='nameinfo'][1]/div[@class='namesub'][1]/span[@class='info']")
+    val typeOf = page.getFirstByXPath("//div[@id='body']//article//div[@class='infogroup']/div[@class='infoname' and contains(.,'Type')]/span[@class='infoname-info']")
       .asInstanceOf[HtmlElement].asNormalizedText()
 
-    val usage = page.getFirstByXPath("//div[@class='body']//div[@class='nameinfo'][1]/div[@class='namesub'][2]/span[@class='info']").asInstanceOf[HtmlElement]
-      .asNormalizedText()
+    val usages = page.getByXPath[HtmlElement]("//div[@id='body']//article//div[@class='infogroup']/div[@class='infoname' and contains(.,'Usage')]/span[@class='infoname-info']//a")
+      .asScala
+      .map(_.asNormalizedText())
 
-    val proXpath = "//div[@class='body']//div[@class='nameinfo'][1]/div[@class='namesub']/span[text()='PRONOUNCED:']"
-    val proOpt = Option(page.getFirstByXPath(proXpath).asInstanceOf[HtmlElement]).map(e => e.getNextElementSibling.asNormalizedText())
+    val pronunciations = page.getByXPath[HtmlElement]("//div[@id='body']//article//div[@class='infogroup']/div[@class='infoname' and contains(.,'Pronounced')]/span[@class='infoname-info']//span[@class='infoname-unit']")
+      .asScala
+      .map(_.asNormalizedText())
 
-    val histOpt = Option(page.getFirstByXPath("//div[@class='body']//div[text()='Meaning & History']")
+    val rootsOpt =  Option(
+      page.getFirstByXPath("//div[@id='body']//article//section[contains(.,'Related Names')]//div[@class='inforel' and contains(.,'Roots')]//span[@class='inforel-info']")
+        .asInstanceOf[HtmlElement]).map(_.asNormalizedText().replaceAll("[\r\n]*","").replaceAll("Expand Name Links",""))
+
+    val histOpt = Option(page.getFirstByXPath("//div[@id='body']//article//section//div[@class='nameheading wide' and contains(.,'Meaning & History')]")
       .asInstanceOf[HtmlElement]).map(e => e.getNextElementSibling.asNormalizedText().replaceAll("[\r\n]*","").replaceAll("Expand Name Links",""))
 
-    val varOpt = page.getByXPath("//div[@class='body']//div[@class='nameinfo'][2]/div[@class='namesub']/span[@class='info']").asInstanceOf[java.util
-    .List[HtmlElement]].asScala
+    val varsList =  Option(
+      page.getFirstByXPath("//div[@id='body']//article//section[contains(.,'Related Names')]//div[@class='inforel' and contains(.,'Variant')]//span[@class='inforel-info']")
+        .asInstanceOf[HtmlElement]
+    ).map(e => e.getChildren.asScala)
+      .getOrElse(mutable.Buffer.empty[DomNode])
+      .filter(!_.isInstanceOf[DomText])
 
+    val varsMap = convertToMap(varsList)
+
+
+    val othersList =  Option(
+      page.getFirstByXPath("//div[@id='body']//article//section[contains(.,'Related Names')]//div[@class='inforel' and contains(.,'Other Languages & Cultures')]//span[@class='inforel-info']")
+        .asInstanceOf[HtmlElement]
+    ).map(e => e.getChildren.asScala)
+      .getOrElse(mutable.Buffer.empty[DomNode])
+      .filter(!_.isInstanceOf[DomText])
+
+    val othersMap = convertToMap(othersList)
+
+    val firstList =  Option(
+      page.getFirstByXPath("//div[@id='body']//article//section[contains(.,'Related Names')]//div[@class='inforel' and contains(.,'Given Name Descendant')]//span[@class='inforel-info']")
+        .asInstanceOf[HtmlElement]
+    ).map(e => e.getChildren.asScala)
+      .getOrElse(mutable.Buffer.empty[DomNode])
+      .filter(!_.isInstanceOf[DomText])
+
+    val firstMap = convertToMap(firstList)
 
     val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
-    writer.write(title, source,usage,proOpt.getOrElse(""),varOpt.map(_.asNormalizedText()).mkString(","),histOpt.getOrElse(""))
+    writer.write(
+      title,
+      typeOf,
+      usages.mkString("|"),
+      pronunciations.mkString("|"),
+      rootsOpt.getOrElse(""),
+      varsMap.map{case (k,v) => k + "=" + v.mkString("[","|","]")}.mkString("|"),
+      othersMap.map{case (k,v) => k + "=" + v.mkString("[","|","]")}.mkString("|"),
+      firstMap.map{case (k,v) => k + "=" + v.mkString("[","|","]")}.mkString("|"),
+      histOpt.getOrElse("")
+    )
     writer.close()
   }
 

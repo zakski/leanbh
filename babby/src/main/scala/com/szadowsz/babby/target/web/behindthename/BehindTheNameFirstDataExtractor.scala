@@ -29,6 +29,9 @@ class BehindTheNameFirstDataExtractor extends HtmlExtractor {
           sameOrigin = List[String]()
       }
     }
+    if (sameOrigin.nonEmpty){
+      map.put("_", sameOrigin)
+    }
     map.toMap
   }
 

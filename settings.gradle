@@ -1,2 +1,2 @@
 rootProject.name = 'leanbh'
-include 'maeve', 'babby', 'phobail'
+include 'maeve', 'babby', 'phobail', 'logainm'

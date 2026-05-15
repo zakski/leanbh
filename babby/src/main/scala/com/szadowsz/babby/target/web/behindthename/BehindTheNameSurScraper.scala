@@ -52,7 +52,7 @@ object BehindTheNameSurScraper {
 
     val urlFiles = FileFinder.search("./data/web/behindthename/", Option(new ExtensionFilter(".txt",false)))
 
-    val urls = urlFiles.flatMap { f =>
+    val urls = urlFiles.sortBy(_.getName).flatMap { f =>
       val read = new FReader(f.getAbsolutePath)
 
       val buff = ArrayBuffer[String]()
@@ -63,6 +63,7 @@ object BehindTheNameSurScraper {
       } while (l.isDefined)
       buff.toList.distinct
     }
+
     val target2 = PathTarget(Uri("http://www.surname.behindthename.com/"),urls)
     val filter2 =  new BehindTheNameSurDataExtractor
     val instruction2 = MaeveInstruction("behindthenameSurnames", target2, actions, filter2, "./data/web/behindthename/", true, true)
