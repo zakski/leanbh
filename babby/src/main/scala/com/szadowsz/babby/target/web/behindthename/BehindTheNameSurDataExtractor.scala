@@ -60,7 +60,7 @@ class BehindTheNameSurDataExtractor extends HtmlExtractor {
       page.getFirstByXPath("//div[@id='body']//article//section[contains(.,'Related Names')]//div[@class='inforel' and contains(.,'Roots')]//span[@class='inforel-info']")
         .asInstanceOf[HtmlElement]).map(_.asNormalizedText().replaceAll("[\r\n]*","").replaceAll("Expand Name Links",""))
 
-    val histOpt = Option(page.getFirstByXPath("//div[@id='body']//article//section//div[@class='nameheading wide' and contains(.,'Meaning & History')]")
+    val histOpt = Option(page.getFirstByXPath("//div[@id='body']//article//section//div[contains(.,'Meaning & History')]")
       .asInstanceOf[HtmlElement]).map(e => e.getNextElementSibling.asNormalizedText().replaceAll("[\r\n]*","").replaceAll("Expand Name Links",""))
 
     val varsList =  Option(

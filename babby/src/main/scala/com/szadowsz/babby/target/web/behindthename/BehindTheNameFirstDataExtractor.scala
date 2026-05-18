@@ -110,7 +110,7 @@ class BehindTheNameFirstDataExtractor extends HtmlExtractor {
 
     val sursMap = convertToMap(sursList)
 
-    val histOpt = Option(page.getFirstByXPath("//div[@id='body']//article//section//div[@class='nameheading wide' and contains(.,'Meaning & History')]")
+    val histOpt = Option(page.getFirstByXPath("//div[@id='body']//article//section//div[contains(.,'Meaning & History')]")
       .asInstanceOf[HtmlElement]).map(e => e.getNextElementSibling.asNormalizedText().replaceAll("[\r\n]*","").replaceAll("Expand Name Links",""))
 
     val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
