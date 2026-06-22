@@ -43,8 +43,10 @@ case class FragmentFeederTarget(
     *
     * @return the instance, updated to the next target in the sequence
     */
-  def next():FragmentFeederTarget = {
-    hist += seq.remove(0)
+  override def next(dropHistory : Boolean = false) :FragmentFeederTarget = {
+    if (!dropHistory) {
+      hist += seq.remove(0)
+    }
     this
   }
 

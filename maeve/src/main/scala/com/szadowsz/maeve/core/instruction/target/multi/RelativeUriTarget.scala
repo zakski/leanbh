@@ -41,7 +41,13 @@ case class RelativeUriTarget(
     *
     * @return a fresh instance, updated to the next target in the sequence
     */
-  def next() = copy(seq = seq.tail, hist = hist :+ seq.head)
+  def next(dropHistory : Boolean = false): RelativeUriTarget = {
+    if (!dropHistory){
+      copy(seq = seq.tail, hist = hist :+ seq.head)
+    } else {
+      copy(seq = seq.tail, hist = hist)
+    }
+  }
 
   /**
     * Method to reset the target.

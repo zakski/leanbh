@@ -42,7 +42,13 @@ case class QueryTarget(
     *
     * @return a fresh instance, updated to the next target in the sequence
     */
-  override def next() = copy(seq = seq.tail, hist = hist :+ seq.head)
+  override def next(dropHistory : Boolean = false): QueryTarget = {
+    if (!dropHistory){
+      copy(seq = seq.tail, hist = hist :+ seq.head)
+    } else {
+      copy(seq = seq.tail, hist = hist)
+    }
+  }
 
   /**
     * Method to reset the target.

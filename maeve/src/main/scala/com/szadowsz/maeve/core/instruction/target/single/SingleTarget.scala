@@ -37,7 +37,7 @@ case class SingleTarget(link: Uri) extends Target[SingleTarget] {
     *
     * @return a fresh instance, updated to the next target in the sequence
     */
-  override def next(): SingleTarget = this
+  override def next(dropHistory : Boolean = false): SingleTarget = this
 
   /**
     * Method to reset the target.

@@ -17,6 +17,7 @@ package com.szadowsz.babby.target.web.behindthename
 
 import com.szadowsz.common.io.explore.{ExtensionFilter, FileFinder}
 import com.szadowsz.common.io.read.FReader
+import com.szadowsz.common.io.zip.ZipperUtil
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.MaeveDriver
 import com.szadowsz.maeve.core.browser.MaeveConf
@@ -25,6 +26,7 @@ import com.szadowsz.maeve.core.instruction.actions.WaitExecutor
 import com.szadowsz.maeve.core.instruction.target.multi.PathTarget
 import org.slf4j.LoggerFactory
 
+import java.io.File
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -34,7 +36,7 @@ object BehindTheNameSurScraper {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   private val urlBase = Uri("http://www.surname.behindthename.com/names/letter/")
-  private val target = PathTarget(urlBase, ('a' to 'z').flatMap(c => (1 to 4).map(i => c+"/"+ i)))
+  private val target = PathTarget(urlBase, ('a' to 'z').flatMap(c => (1 to 99).map(i => c+"/"+ i)))
   private val conf = new MaeveConf().setJavaScriptEnabled(false).setThrowExceptionOnScriptError(false)
 
 
@@ -72,6 +74,5 @@ object BehindTheNameSurScraper {
     scraper.scrapeUsingCurrInstruction()
     urlFiles.foreach(_.delete())
 
-//    ZipperUtil.zip(new File("./data/web/babynamewizard/behindthenameFirstnames.csv"),new File("./archives/web/behindthename/"))
   }
 }

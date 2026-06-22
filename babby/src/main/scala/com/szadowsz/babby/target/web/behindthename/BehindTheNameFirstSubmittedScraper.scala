@@ -72,7 +72,5 @@ object BehindTheNameFirstSubmittedScraper {
     scraper.feedInstruction(instruction2)
     scraper.scrapeUsingCurrInstruction()
     urlFiles.foreach(_.delete())
-
-    ZipperUtil.zip(new File("./data/web/babynamewizard/behindthenameFirstnamesSub.csv"),new File("./archives/web/behindthename/"))
   }
 }

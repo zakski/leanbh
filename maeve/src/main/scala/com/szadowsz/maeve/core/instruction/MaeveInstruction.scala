@@ -44,7 +44,7 @@ case class MaeveInstruction
   protected def fastForwardMultiTargets(history: List[String], target: P): P = {
     var mTarget = target
     while (!mTarget.isDone && history.contains(mTarget.currentUrl().toString)) {
-      mTarget = mTarget.next()
+      mTarget = mTarget.next(true)
     }
     mTarget
   }

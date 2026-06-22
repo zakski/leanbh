@@ -36,7 +36,7 @@ trait Target[P <: Target[P]] {
     *
     * @return a fresh instance, updated to the next target in the sequence
     */
-  def next(): P
+  def next(dropHistory : Boolean = false): P
 
   /**
     * Method to reset the target.
