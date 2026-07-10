@@ -16,7 +16,7 @@
 package com.szadowsz.logainm.target.placenames.ni
 
 import com.szadowsz.common.net.Uri
-import com.szadowsz.maeve.core.browser.{MaeveBrowser, MaeveHeadlessBrowser}
+import com.szadowsz.maeve.core.browser.{MaeveBrowser, MaeveHeadlessBrowser, MaeveRemoteBrowser}
 import com.szadowsz.maeve.core.instruction.actions.ActionExecutor
 import org.openqa.selenium.JavascriptExecutor
 
@@ -57,7 +57,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long) extends ActionExecu
     * @param browser the browser to interact with.
     */
   override def doAfterExtractAction(browser: MaeveBrowser): Unit = {
-    val headless = browser.asInstanceOf[MaeveHeadlessBrowser]
+    val headless = browser.asInstanceOf[MaeveRemoteBrowser]
 
     val screenHeight = headless.executeScript("return window.screen.height;")
     println(s"Screen Height: $screenHeight")

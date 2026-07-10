@@ -1,14 +1,14 @@
 package com.szadowsz.logainm.target.placenames.ni
 
+import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
-import com.szadowsz.maeve.core.instruction.extractor.HtmlExtractor
-import com.szadowsz.maeve.core.instruction.extractor.util.TxtFileLineWriter
-import org.htmlunit.html._
+import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
+import org.jsoup.nodes.Document
 
 import scala.jdk.CollectionConverters._
 
-class PlacenamesNiEndlessPageExtractor extends HtmlExtractor with TxtFileLineWriter {
+class PlacenamesNiEndlessPageExtractor extends JsoupExtractor {
   /**
    * Generic method to extract data from a webpage.
    *
@@ -17,10 +17,16 @@ class PlacenamesNiEndlessPageExtractor extends HtmlExtractor with TxtFileLineWri
    * @param inst        the current maeve instruction.
    * @param page        the webpage in whatever format is being provided.
    */
-  override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: HtmlPage): Unit = {
+  override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: Document): Unit = {
     val fileName = returnedUrl.path.substring(returnedUrl.path.lastIndexOf('/') - 1, returnedUrl.path.lastIndexOf('/'))
-    val urls = page.getByXPath[DomAttr]("//div[@id='body']//div[@class='browsename']//span[@class='listname']//a/@href").asScala.map { case (url: DomAttr) => url.getValue }
-    write(inst.dPath, fileName, urls.toList, append = true)
+    val places = page.select("div[class=\"widget-list d-flex\"] div[class=\"widget-list-list\"] div[class=\"list-card-content d-flex\"] > div[class=\"app-root-emotion-cache-ltr-1nvu187\"]")
+      .asScala.map { place => place.children().asScala.map(_.text()).toList }
+
+    val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
+    for (place <- places) {
+      writer.write(inst.dPath, fileName, place.head, place(1), place(2), place(3), place(4), place(5))
+    }
+    writer.close()
   }
 
   /**

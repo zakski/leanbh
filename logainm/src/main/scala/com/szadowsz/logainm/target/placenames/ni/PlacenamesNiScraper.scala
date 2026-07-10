@@ -18,6 +18,8 @@ package com.szadowsz.logainm.target.placenames.ni
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.MaeveDriver
 import com.szadowsz.maeve.core.browser.MaeveConf
+
+import java.io.File
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.target.single.SingleTarget
 import org.slf4j.LoggerFactory
@@ -47,12 +49,22 @@ object PlacenamesNiScraper {
     } else {
       throw new RuntimeException(s"Unsupported OS '${osName}'")
     }
-    if (platform.contains("win")) {
-      System.setProperty("webdriver.chrome.driver", s".\\chromedriver_${platform}\\chromedriver.exe")
-    } else {
-      System.setProperty("webdriver.chrome.driver", s".\\chromedriver_${platform}\\chromedriver")
+    val driverName = if (platform.contains("win")) "chromedriver.exe" else "chromedriver"
+    val driverDir = s"chromedriver_$platform"
+
+    var dir = new File(System.getProperty("user.dir"))
+    var driver: File = null
+    while (dir != null && driver == null) {
+      val candidate = new File(new File(dir, driverDir), driverName)
+      if (candidate.isFile) driver = candidate
+      else dir = dir.getParentFile
     }
 
+    if (driver == null) {
+      throw new RuntimeException(s"ChromeDriver not found at $driverDir/$driverName. Run ./gradlew downloadChromeDriver from the project root.")
+    }
+
+    System.setProperty("webdriver.chrome.driver", driver.getAbsolutePath)
   }
 
   def main(args : Array[String]): Unit = {
