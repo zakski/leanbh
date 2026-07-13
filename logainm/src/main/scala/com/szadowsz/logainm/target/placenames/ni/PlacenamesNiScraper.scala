@@ -71,8 +71,9 @@ object PlacenamesNiScraper {
     enableChromeDriver()
     val scraper = new MaeveDriver(conf)
     scraper.setRecoveryDirectory("./recovery/")
-    val filter = new PlacenamesNiEndlessPageExtractor()
-    val actions = new PlacenamesNiEndlessPageExecutor(2000) // try not throttle the website
+    val listState = new PlacenamesNiListState()
+    val filter = new PlacenamesNiEndlessPageExtractor(listState)
+    val actions = new PlacenamesNiEndlessPageExecutor(2000, listState) // try not throttle the website
 
     val instruction1 = MaeveInstruction("placenamesNI", target, actions, filter, "./data/web/placenamesNI/", isHeadless = false, recovEnabled = true)
 
