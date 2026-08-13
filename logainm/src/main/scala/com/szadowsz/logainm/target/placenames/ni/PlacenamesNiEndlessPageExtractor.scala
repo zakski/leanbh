@@ -2,6 +2,7 @@ package com.szadowsz.logainm.target.placenames.ni
 
 import com.szadowsz.common.io.write.CsvWriter
 import com.szadowsz.common.net.Uri
+import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExtractor.LABELS
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
 import org.jsoup.nodes.Document
@@ -9,33 +10,101 @@ import org.jsoup.nodes.Document
 import scala.jdk.CollectionConverters._
 import scala.util.matching.Regex
 
-class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends JsoupExtractor {
+object PlacenamesNiEndlessPageExtractor {
   /**
-   * Generic method to extract data from a webpage.
+   * Detail fields, in output order. Each is rendered as a "Label: value" rich-displayer on the detail
+   * page (the heading-style fields such as Suggested Origin simply have their value on the line(s) after the colon).
+   */
+  val LABELS: List[String] = List(
+    "Barony",
+    "Parish (1851)",
+    "Parish (1961)",
+    "Townland",
+    "Place-Name ID",
+    "Type",
+    "Suggested Origin",
+    "Irish Form",
+    "Background",
+    "References",
+    "Additional Information"
+  )
+
+  /**
+   * Get the Title of the Placename Detail Page
+   *
+   * @param page the page to read
+   * @return the placename page's title shown at the top of the detail page.
+   */
+  private def getTitle(page: Document): String = {
+    val heading = page.select("div[data-widgetid=\"widget_829\"] div[data-testid=\"rich-displayer\"]").text().trim
+    if (heading.nonEmpty) {
+      heading
+    } else {
+      page.select("div[data-testid=\"rich-displayer\"]").asScala.headOption.map(_.text().trim).getOrElse("")
+    }
+  }
+
+  /**
+   * Finds the rich-displayer whose text begins with "<label>:" and returns the value after the colon.
+   *
+   * @param page the page to read
+   * @param label the field to read
+   * @return the field value, or an empty string if the field is not present.
+   */
+  private def getField(page: Document, label: String): String = {
+    val marker = label + ":"
+    page.select("div[data-testid=\"rich-displayer\"]").asScala
+      .map(_.text().trim)
+      .find(_.startsWith(marker))
+      .map(_.substring(marker.length).trim)
+      .getOrElse("")
+  }
+
+  /**
+   * Collects the names of the historical forms listed on the detail page
+   *
+   * @param page the page to read
+   * @return Returns a string of the historical forms, joined with " | "; These live virtually, so only what is currently rendered are captured.
+   */
+  private def getHistoricalForms(page: Document): String = {
+    // Scope to the detail page's own Historical Forms list (widget_927). During the ArcGIS Experience page
+    // transition the search results list (widget_895) can still be in the DOM, and an unscoped selector would
+    // otherwise capture those search place-names instead of this record's historical forms.
+    page.select("div.list-widget-widget_927 div[data-react-window-index] div[data-layoutitemid=\"1\"] div[data-testid=\"rich-displayer\"]")
+      .asScala
+      .map(_.text().trim)
+      .filter(_.nonEmpty)
+      .mkString(" | ")
+  }
+}
+
+class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends JsoupExtractor {
+
+  /**
+   * Extracts a single place-name record from its detail ("Place-Name Info") page. The executor has already
+   * navigated the browser to this page for the current row, so the supplied document is the detail page.
    *
    * @param queryUrl    the expected url of the page.
    * @param returnedUrl the actual url of the page.
    * @param inst        the current maeve instruction.
-   * @param page        the webpage in whatever format is being provided.
+   * @param page        the detail page document.
    */
   override def extract(queryUrl: Uri, returnedUrl: Uri, inst: MaeveInstruction[_], page: Document): Unit = {
-    val fileName = returnedUrl.path.substring(returnedUrl.path.lastIndexOf('/') - 1, returnedUrl.path.lastIndexOf('/'))
-    val rows = page.select("div[class=\"widget-list d-flex\"] div[class=\"widget-list-list\"] div[class=\"list-card-content d-flex\"] div[class=\"layout fixed-layout d-flex\"] > div[class=\"app-root-emotion-cache-ltr-1nvu187\"]").asScala
+    if (state.complete) {
+      return
+    }
+    if (!state.markWritten(state.currentIndex)) {
+      return
+    } // already written (retry / resume) - do not duplicate
+
+    val title = PlacenamesNiEndlessPageExtractor.getTitle(page)
+    val fields = LABELS.map(label => PlacenamesNiEndlessPageExtractor.getField(page, label))
+    val historical = PlacenamesNiEndlessPageExtractor.getHistoricalForms(page)
+
+    val row: Seq[String] = (title +: fields) :+ historical
 
     val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
-    for (row <- rows) {
-      val place = row.children().select("div[data-testid=\"rich-displayer\"]").asScala.map(_.text()).toList :+ row.select("a.jimu-button[aria-label=\"More Info\"]").attr("href")
-
-      // Key each row by its react-window index so overlapping scroll steps do not write the same record twice.
-      val wrapper = row.closest("[data-react-window-index]")
-      val key = if (wrapper != null) wrapper.attr("data-react-window-index") else place.mkString("\u0001")
-
-      // Skip rows the JS app has rendered but not yet bound (still showing {TEMPLATE} tokens or missing cells);
-      // these are the "extracted too early" rows. Also skip rows already written on a previous scroll step.
-      if (place.length >= 6 && !PlacenamesNiEndlessPageExtractor.hasUnboundTemplate(place) && state.seen.add(key)) {
-        writer.write(place.head, place(1), place(2), place(3), place(4), place(5))
-      }
-    }
+    writer.write(row)
     writer.close()
   }
 
@@ -47,12 +116,4 @@ class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends Jso
   override def shouldContinue(): Boolean = {
     !state.complete
   }
-}
-
-object PlacenamesNiEndlessPageExtractor {
-  /** Matches an unresolved ArcGIS field expression such as {PLACE_NAME} or {COUNTY}. */
-  private val unboundTemplate: Regex = "\\{[A-Z0-9_]+\\}".r
-
-  private def hasUnboundTemplate(values: Seq[String]): Boolean =
-    values.exists(value => unboundTemplate.findFirstIn(value).isDefined)
 }
