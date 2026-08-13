@@ -17,13 +17,18 @@ package com.szadowsz.maeve.core.instruction
 
 import com.szadowsz.common.net.Uri
 import com.szadowsz.maeve.core.browser.{MaeveBrowser, MaeveConf}
+import com.szadowsz.maeve.core.instruction.MaeveInstruction.LOGGER
 import com.szadowsz.maeve.core.instruction.actions.ActionExecutor
 import com.szadowsz.maeve.core.instruction.extractor.{DataExtractor, DomExtractor, HtmlExtractor, JsoupExtractor}
 import com.szadowsz.maeve.core.instruction.target.Target
 import com.szadowsz.maeve.core.instruction.target.multi.MultiTarget
 import com.szadowsz.maeve.core.instruction.target.multi.feeder.FragmentFeederTarget
 import com.szadowsz.maeve.core.instruction.target.single.SingleTarget
+import org.slf4j.LoggerFactory
 
+object MaeveInstruction {
+  private val LOGGER = LoggerFactory.getLogger(this.getClass)
+}
 /**
   * Created on 12/10/2016.
   */
@@ -58,11 +63,17 @@ case class MaeveInstruction
           t.addToQueue(Uri(history.last).fragment)
           copy(target = t.asInstanceOf[P])
 
-        case mult: MultiTarget[_, _] => copy(target = fastForwardMultiTargets(history, target))
+        case mult: MultiTarget[_, _] =>
+          LOGGER.info(s"Multi Target, Recovered {} URLs", usedLinks.size)
+          copy(target = fastForwardMultiTargets(history, target))
 
-        case sing: SingleTarget => this
+        case sing: SingleTarget =>
+          LOGGER.info(s"Single Target, No URL Recovery Possible")
+          this
 
-        case _ => this
+        case _ =>
+          LOGGER.info(s"Unknown Target, No URL Recovery Possible")
+          this
       }
     } else {
       this

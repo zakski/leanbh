@@ -28,9 +28,11 @@ class IrishCensusScraper(
   protected def buildInstruction(): MaeveInstruction[_] = {
     val name = s"irishCensus-$year"
     logger.info("Attempting Recovery")
-    var history = RecoveryUtil.doRecovery(recovPath, name).distinct
+    var history : List[String] = RecoveryUtil.doRecovery(recovPath, name).distinct
+    logger.info(s"Recovered ${history.length} urls")
     val numofUrlsPerPage = fileLimit / pageIncrement
     val completedPageCount = history.length / numofUrlsPerPage
+    logger.info(s"Skipping ${completedPageCount} pages")
     val currentPageRemainder = history.length % numofUrlsPerPage
     if (currentPageRemainder != 0) {
       history = history.dropRight(currentPageRemainder)
