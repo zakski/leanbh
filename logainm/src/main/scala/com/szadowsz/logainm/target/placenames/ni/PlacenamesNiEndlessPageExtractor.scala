@@ -6,9 +6,9 @@ import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExtracto
 import com.szadowsz.maeve.core.instruction.MaeveInstruction
 import com.szadowsz.maeve.core.instruction.extractor.JsoupExtractor
 import org.jsoup.nodes.Document
+import org.slf4j.LoggerFactory
 
 import scala.jdk.CollectionConverters._
-import scala.util.matching.Regex
 
 object PlacenamesNiEndlessPageExtractor {
   /**
@@ -79,6 +79,7 @@ object PlacenamesNiEndlessPageExtractor {
 }
 
 class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends JsoupExtractor {
+  private val logger = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Extracts a single place-name record from its detail ("Place-Name Info") page. The executor has already
@@ -93,19 +94,24 @@ class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends Jso
     if (state.complete) {
       return
     }
-    if (!state.markWritten(state.currentIndex)) {
+
+    val title = PlacenamesNiEndlessPageExtractor.getTitle(page)
+    if (!state.markWritten(state.currentIndex, title)) {
+      logger.warn("Skipping write for index {} ('{}'): already written this run/resume (no CSV line appended)",
+        Integer.valueOf(state.currentIndex), title)
       return
     } // already written (retry / resume) - do not duplicate
 
-    val title = PlacenamesNiEndlessPageExtractor.getTitle(page)
     val fields = LABELS.map(label => PlacenamesNiEndlessPageExtractor.getField(page, label))
     val historical = PlacenamesNiEndlessPageExtractor.getHistoricalForms(page)
 
     val row: Seq[String] = (title +: fields) :+ historical
 
-    val writer = new CsvWriter(inst.dPath + s"${inst.name}.csv", "UTF-8", true)
+    val csvPath = inst.dPath + s"${inst.name}.csv"
+    val writer = new CsvWriter(csvPath, "UTF-8", true)
     writer.write(row)
     writer.close()
+    logger.info("Appended CSV line for index {} ('{}') to {}", Integer.valueOf(state.currentIndex), title, csvPath)
   }
 
   /**

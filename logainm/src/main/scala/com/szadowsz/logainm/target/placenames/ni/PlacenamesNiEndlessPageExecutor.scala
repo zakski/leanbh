@@ -16,19 +16,21 @@
 package com.szadowsz.logainm.target.placenames.ni
 
 import com.szadowsz.common.net.Uri
-import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExecutor.{PLACENAME_LIST_MARKER, PLACENAME_SCROLL_STEP_PX, PLACENAME_SCROLL_STEP_ROWS, SCROLL_SELECTOR_JS, SCROLL_SELECTOR_NAME}
+import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExecutor.{PLACENAME_DETAIL_MARKER, PLACENAME_LIST_MARKER, PLACENAME_SCROLL_STEP_PX, PLACENAME_SCROLL_STEP_ROWS, RESULTS_SCROLL_XPATH, SCROLL_SELECTOR_JS}
 import com.szadowsz.maeve.core.browser.MaeveBrowser
 import com.szadowsz.maeve.core.instruction.actions.ActionExecutor
-import org.htmlunit.html.HtmlElement
 import org.openqa.selenium.JavascriptExecutor
 import org.slf4j.LoggerFactory
+import org.w3c.dom.{Node, NodeList}
 
-import scala.jdk.CollectionConverters.ListHasAsScala
+import javax.xml.xpath.{XPathConstants, XPathFactory}
 
 
 object PlacenamesNiEndlessPageExecutor {
 
-  val PLACENAME_LIST_MARKER = "Place-Name-Search" // title for the placename search list web page
+  val PLACENAME_LIST_MARKER = "Place-Name-Search" // url fragment for the placename search list web page
+
+  val PLACENAME_DETAIL_MARKER = "Place-Name-Info" // url fragment for a single place-name's detail ("More Info") page
 
   val PLACENAME_ROW_HEIGHT_PX = 71L // Nominal row height of the search list. Rows can vary in height, this is standard
 
@@ -41,6 +43,12 @@ object PlacenamesNiEndlessPageExecutor {
   private val SCROLL_SELECTOR_NAME = "div.widget-list-list"
 
   private val SCROLL_SELECTOR_JS = RESULTS_LIST_SELECTOR + " " + SCROLL_SELECTOR_NAME
+
+  // XPath (for the w3c DOM returned by getPageAsDom) locating the results scroll container, scoped to the results
+  // list widget (widget_895) so the separate Historical Forms list widget on the same page is never matched.
+  val RESULTS_SCROLL_XPATH: String =
+    "//div[contains(concat(' ', normalize-space(@class), ' '), ' list-widget-widget_895 ')]" +
+      "//div[contains(concat(' ', normalize-space(@class), ' '), ' widget-list-list ')]"
 
 }
 
@@ -65,14 +73,40 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
 
   // The ArcGIS Experience list widget container that holds the rendered place-name records.
   private val listSelector = "div[class=\"widget-list d-flex\"]"
-   // Spinner the ArcGIS Experience app shows while it is still fetching / rendering the list.
+  // The virtualised (react-window) scroll container inside the list widget.
+  private val scrollSelector = "div.widget-list-list"
+  // Spinner the ArcGIS Experience app shows while it is still fetching / rendering the list.
   private val loadingSelector = "div.jimu-secondary-loading"
   // Overlap one row height between scroll steps so react-window virtualisation can never skip a record.
   private val rowOverlapPx = 71L
   // Total time we are prepared to wait for the JS app to finish rendering the list.
   private val maxWaitMs = math.max(timeInMS * 15, 30000L)
   private val pollIntervalMs = 500L
+  // Reused to evaluate XPath against the w3c DOM snapshot returned by getPageAsDom (single-threaded crawl).
+  private val xpath = XPathFactory.newInstance().newXPath()
+  // Scroll position of the results list when the current record was opened, restored after returning from its detail
+  // page so the crawl does not have to re-scroll from the top for every record.
+  private var lastListScrollTop = 0L
+  // Place-name of the record most recently opened/extracted. Used to re-locate our position in the list (which can
+  // re-render, and so shift react-window indices, when we return to it) rather than blindly trusting index + 1.
+  private var lastProcessedName = ""
 
+  // Full-reload the page after this many records to reset the ArcGIS Experience app's renderer memory (the tab was
+  // observed to crash around 900 records of client-side list<->detail navigation). Set to 0 to disable.
+  private val reloadEvery = 150
+
+
+  /**
+   * Evaluates the given XPath against the current page's w3c DOM (getPageAsDom) and returns the matched nodes.
+   *
+   * @param browser    the browser whose current page DOM is queried.
+   * @param expression the XPath expression to evaluate.
+   * @return the matched nodes in document order (empty if none match).
+   */
+  private def selectNodes(browser: MaeveBrowser, expression: String): Seq[Node] = {
+    val nodes = xpath.evaluate(expression, browser.getPageAsDom, XPathConstants.NODESET).asInstanceOf[NodeList]
+    (0 until nodes.getLength).map(nodes.item)
+  }
 
   /**
    * @return true if the row at the given index is currently marked selected (aria-selected="true").
@@ -88,8 +122,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
   }
 
   private def isRowPresent(browser: MaeveBrowser, index: Int): Boolean = {
-    val row = Option(browser.getPageAsHtml.getFirstByXPath[HtmlElement](s"//$SCROLL_SELECTOR_NAME//div[data-react-window-index='$index']"))
-    return row.nonEmpty
+    selectNodes(browser, s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index='$index']").nonEmpty
   }
 
   /**
@@ -104,8 +137,23 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    *         in its leading cell, i.e. the record data has not been populated yet.
    */
   private def hasUnboundRows(browser: MaeveBrowser): Boolean = {
-    val rowElements = browser.getPageAsHtml.getByXPath[HtmlElement](s"//$SCROLL_SELECTOR_NAME//div[data-react-window-index]'").asScala
-    rowElements.map(e => e.getTextContent.trim).exists(isUnbound)
+    selectNodes(browser, s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index]").map(_.getTextContent.trim).exists(isUnbound)
+  }
+
+  /**
+   * @return true while any currently rendered row still shows an unbound {TEMPLATE} expression, i.e. the JS app
+   *         has injected the row markup but not yet resolved the record's field values.
+   */
+  private def hasUnboundTemplates(js: JavascriptExecutor): Boolean = {
+    val result = js.executeScript(
+      "var els = document.querySelectorAll(arguments[0] + ' div[data-testid=\"rich-displayer\"]');" +
+        "for (var i = 0; i < els.length; i++) { if (/\\{[A-Z0-9_]+\\}/.test(els[i].textContent)) { return true; } }" +
+        "return false;",
+      listSelector)
+    result match {
+      case b: java.lang.Boolean => b.booleanValue()
+      case _ => false
+    }
   }
 
   private def urlContains(browser: MaeveBrowser, marker: String): Boolean =
@@ -120,8 +168,10 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    * @return the row's place-name text, or None if the row is not currently rendered.
    */
   private def getRowName(browser: MaeveBrowser, index: Int): Option[String] = {
-    val nameElement = browser.getPageAsHtml.getFirstByXPath[HtmlElement](s"//$SCROLL_SELECTOR_NAME//div[data-react-window-index='$index']'")
-    Some(nameElement).map(_.getTextContent.trim())
+    selectNodes(browser,
+      s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index='$index']//div[@data-layoutitemid='1']//div[@data-testid='rich-displayer']")
+      .headOption
+      .map(_.getTextContent.trim)
   }
 
   /**
@@ -190,6 +240,275 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
       (renderedRowCount(js) == 0 || isLoading(js) || hasUnboundRows(browser))) {
       Thread.sleep(pollIntervalMs)
     }
+  }
+
+
+  /**
+   * Blocks until the JavaScript-driven list widget has finished loading and actually rendered its records with
+   * their data bound. Readiness is gated on the ArcGIS 'jimu-secondary-loading' spinner disappearing, at least
+   * one row being present, and no row still showing an unbound {TEMPLATE} expression. Without this the extractor
+   * can run against a still-loading DOM (empty, or rows showing {PLACE_NAME} etc.). A timeout throws so that
+   * MaeveDriver's retry/refresh logic reacts instead of silently extracting nothing.
+   *
+   * @param browser the browser to interact with.
+   */
+  private def waitForData(browser: MaeveBrowser): Unit = {
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    val deadline = System.currentTimeMillis() + maxWaitMs
+
+    var ready = false
+    while (!ready && System.currentTimeMillis() < deadline) {
+      if (!isLoading(js) && renderedRowCount(js) > 0 && !hasUnboundTemplates(js)) {
+        ready = true
+      } else {
+        Thread.sleep(pollIntervalMs)
+      }
+    }
+
+    if (!ready) {
+      throw new IllegalStateException(
+        s"Place-name list ('$listSelector') did not finish loading within ${maxWaitMs}ms")
+    }
+    logger.info("Place-name list finished loading and rendered bound rows")
+  }
+
+
+  /**
+   * Blocks until the detail page is loaded and its record fields are bound. Throws on timeout.
+   */
+  private def waitForDetailPage(browser: MaeveBrowser): Unit = {
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    val deadline = System.currentTimeMillis() + maxWaitMs
+    while (System.currentTimeMillis() < deadline && !(urlContains(browser, PLACENAME_DETAIL_MARKER) && detailBound(js))) {
+      Thread.sleep(pollIntervalMs)
+    }
+    if (!(urlContains(browser, PLACENAME_DETAIL_MARKER) && detailBound(js))) {
+      throw new IllegalStateException(s"Place-Name-Info detail page did not load within ${maxWaitMs}ms")
+    }
+  }
+
+  /**
+   * Scrolls the virtualised list container down by one viewport, overlapping one row so no record is skipped.
+   */
+  private def scrollDown(js: JavascriptExecutor): Unit = {
+    js.executeScript(
+      "var c = document.querySelector(arguments[0]);" +
+        "if (c) { c.scrollTop = c.scrollTop + Math.max(1, c.clientHeight - arguments[1]); }",
+      scrollSelector, java.lang.Long.valueOf(rowOverlapPx))
+  }
+
+  /**
+   * @return whether the list container is scrolled to the bottom, and its current total scroll height.
+   */
+  private def scrollMetrics(js: JavascriptExecutor): (Boolean, Long) = {
+    js.executeScript(
+      "var c = document.querySelector(arguments[0]);" +
+        "if (!c) { return null; }" +
+        "return {atBottom: (c.scrollTop + c.clientHeight) >= (c.scrollHeight - 2), scrollHeight: c.scrollHeight};",
+      scrollSelector) match {
+      case m: java.util.Map[_, _] =>
+        val jm = m.asInstanceOf[java.util.Map[String, AnyRef]]
+        val atBottom = jm.get("atBottom") match {
+          case b: java.lang.Boolean => b.booleanValue()
+          case _ => false
+        }
+        val height = jm.get("scrollHeight") match {
+          case n: java.lang.Number => n.longValue()
+          case _ => -1L
+        }
+        (atBottom, height)
+      case _ => (true, -1L)
+    }
+  }
+  /**
+   * @return true once the detail page has a bound "Place-Name ID" field (i.e. the record has finished loading).
+   */
+  private def detailBound(js: JavascriptExecutor): Boolean = {
+    js.executeScript(
+      "var els = document.querySelectorAll('div[data-testid=\"rich-displayer\"]');" +
+        "for (var i = 0; i < els.length; i++) { var t = (els[i].textContent || '').trim();" +
+        " if (t.indexOf('Place-Name ID:') === 0 && /[0-9]/.test(t)) { return true; } }" +
+        "return false;") match {
+      case b: java.lang.Boolean => b.booleanValue()
+      case _ => false
+    }
+  }
+
+  /**
+   * Dispatches a full mouse-event sequence at the element so EXB's React handler fires. Uses events rather than
+   * element.click() so a virtualised row that is only partially in view is still actionable.
+   *
+   * @return true if the element was found, false otherwise.
+   */
+  private def clickElement(js: JavascriptExecutor, selector: String): Boolean = {
+    js.executeScript(
+      "var el = document.querySelector(arguments[0]); if (!el) { return false; }" +
+        "['pointerdown','mousedown','mouseup','click'].forEach(function(t){" +
+        " el.dispatchEvent(new MouseEvent(t, {bubbles: true, cancelable: true, view: window})); });" +
+        "return true;",
+      selector) match {
+      case b: java.lang.Boolean => b.booleanValue()
+      case _ => false
+    }
+  }
+
+  /**
+   * Opens the detail page for the given row and confirms it is the correct record before returning: the list
+   * row's place-name is read first, then - after navigating - the detail page's title is compared against it.
+   * On a mismatch the browser returns to the list and the open is retried, so a mis-selection can never silently
+   * write a wrong/duplicate record. Throws if it cannot reconcile after several attempts rather than proceeding.
+   *
+   * @return true once the browser is on the confirmed detail page; false if the row could not be opened at all
+   *         (e.g. it is past the end of the list).
+   */
+  private def openAndVerify(browser: MaeveBrowser, js: JavascriptExecutor, index: Int): Boolean = {
+    val maxAttempts = 3
+    var attempt = 0
+    while (attempt < maxAttempts) {
+      attempt += 1
+      getBoundRowName(browser, index) match {
+        case None =>
+          logger.warn("Row {} has no bound place-name yet (attempt {}/{}); retrying",
+            Integer.valueOf(index), Integer.valueOf(attempt), Integer.valueOf(maxAttempts))
+          waitForRowsBound(browser)
+        case Some(expected) =>
+          if (throttleMs > 0) {
+            Thread.sleep(throttleMs) // deliberately slow down so we do not hammer the site
+          }
+          if (!openRow(js, index)) {
+            return false // the row/button is not present - treated as the end of the list by the caller
+          }
+          waitForDetailPage(browser)
+          val shown = detailTitle(js)
+          if (namesMatch(expected, shown)) {
+            logger.info("Opened detail page '{}' for row {}", shown, Integer.valueOf(index))
+            lastProcessedName = expected // remembered so we can re-locate our position after returning to the list
+            return true // confirmed correct record; leave the browser here for the extractor
+          }
+          logger.warn("'More Info' opened the wrong record for row {} (expected '{}' but detail shows '{}'); recovering",
+            Integer.valueOf(index), expected, shown)
+          goBackToList(browser)
+          setScrollTop(js, 0L)
+          waitForRowsBound(browser)
+          if (!scrollToIndex(browser)) {
+            return false
+          }
+      }
+    }
+    throw new IllegalStateException(
+      s"'More Info' kept opening the wrong record for index $index after $maxAttempts attempts; aborting rather " +
+        s"than writing misaligned data.")
+  }
+
+  /**
+   * Selects the target row and clicks its "More Info". Every row's "More Info" button carries the same static
+   * href, so the record actually opened is whichever list row the widget currently has selected. We therefore
+   * first select the target row via its (full-height, untransformed) role="option" element - keyed by
+   * data-react-window-index so we always act on the intended row - and only then click its "More Info" button.
+   * This removes the off-by-one that occurred when clicking the (vertically offset) button without an explicit
+   * selection.
+   *
+   * @return true if the row was selected and its "More Info" clicked; false if the elements were not found.
+   */
+  private def openRow(js: JavascriptExecutor, index: Int): Boolean = {
+    val rowSelector = scrollSelector + " div[data-react-window-index='" + index + "']"
+    // Select the row so it becomes the widget's current feature.
+    if (!clickElement(js, rowSelector + " div[role='option']")) {
+      return false
+    }
+    // Give the selection a brief moment to register before navigating. aria-selected is not reliably reflected on
+    // these result rows, but the click still updates the widget's selected record (which is what the shared static
+    // "More Info" href resolves against - openAndVerify confirms the opened detail page by name regardless). So an
+    // unconfirmed selection is not an error: we just settle briefly (exiting early when it *is* observable, e.g. the
+    // pre-selected first row) rather than burning the full page-load budget polling for a signal that never comes.
+    val deadline = System.currentTimeMillis() + 1500L
+    while (!isRowSelected(js, index) && System.currentTimeMillis() < deadline) {
+      Thread.sleep(pollIntervalMs)
+    }
+    if (!isRowSelected(js, index)) {
+      logger.debug("Row {} selection not observable via aria-selected; proceeding (the opened detail page is verified by name)", Integer.valueOf(index))
+    }
+    clickMoreInfo(js, index)
+  }
+
+  /**
+   * @return the detail page's title (the place-name heading in widget_829), or an empty string if not present.
+   */
+  private def detailTitle(js: JavascriptExecutor): String = {
+    js.executeScript(
+      "var el = document.querySelector('div[data-widgetid=\"widget_829\"] div[data-testid=\"rich-displayer\"]');" +
+        "return el ? (el.textContent || '').trim() : '';") match {
+      case s: String => s.trim
+      case _ => ""
+    }
+  }
+
+  /**
+   * Scrolls the virtualised list down until the row at the given index is rendered. Scrolling proceeds in steps,
+   * pausing for lazy-loaded records between each, so far-down rows (e.g. when resuming) become available. The
+   * list starts at the top after every load / go-back, so the walk is always downward.
+   *
+   * @return true once the row is present in the DOM, false if the index is past the end of the list.
+   */
+  private def scrollToIndex(browser: MaeveBrowser): Boolean = {
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    val index = state.currentIndex
+    if (isRowPresent(browser, index)) {
+      return true // already rendered (the list often keeps its position after returning from a detail page)
+    }
+    // Scale the deadline with the distance: each scroll step can cost a poll plus a lazy-load wait, so allow one
+    // per row-step needed to reach the index, with maxWaitMs as a floor for short scrolls.
+    val stepRows = math.max(1L, PLACENAME_SCROLL_STEP_ROWS)
+    val perStepMs = pollIntervalMs + math.max(timeInMS, 3000L)
+    val budgetMs = math.max(maxWaitMs, (index.toLong / stepRows + 1L) * perStepMs)
+    logger.info("Scrolling to row {}, budget {}ms", Integer.valueOf(index), java.lang.Long.valueOf(budgetMs))
+    val deadline = System.currentTimeMillis() + budgetMs
+    var endChecks = 0
+    var lastTop = -1L
+    // Step down by a fixed amount (never a pixel target computed from the index, which drifts on variable-height
+    // rows) until the row's react-window element renders, or we are clamped at the bottom of the list.
+    while (System.currentTimeMillis() < deadline) {
+      setScrollTop(js, getScrollTop(js) + PLACENAME_SCROLL_STEP_PX)
+      waitForList(browser) // let any lazily loaded records arrive before checking again
+      Thread.sleep(pollIntervalMs)
+      if (isRowPresent(browser, index)) {
+        logger.info("Found Row, Stopping Scrolling")
+        return true
+      }
+      val top = getScrollTop(js)
+      if (atListBottom(js) && top == lastTop) {
+        endChecks += 1
+        if (endChecks >= 3) {
+          logger.info("Did Not Find Row, Stopping Scrolling")
+          return false // clamped at the bottom and the row never appeared -> end of list
+        }
+      } else {
+        endChecks = 0
+      }
+      lastTop = top
+    }
+    logger.info("Ran Out Of Time, Stopping Scrolling")
+    isRowPresent(browser, index)
+  }
+
+  /**
+   * Clicks the "More Info" button of the given row to navigate to its detail page.
+   *
+   * @return true if the button was found and clicked.
+   */
+  private def clickMoreInfo(js: JavascriptExecutor, index: Int): Boolean = {
+    clickElement(js, scrollSelector + " div[data-react-window-index='" + index + "'] a[aria-label='More Info']")
+  }
+
+  /**
+   * Returns to the search list, clicking the detail page's "Go Back" button (falling back to browser history).
+   */
+  private def goBackToList(browser: MaeveBrowser): Unit = {
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    if (!clickElement(js, "a[aria-label='Go Back']")) {
+      browser.navigate().back()
+    }
+    waitForList(browser)
   }
 
   private def atListBottom(js: JavascriptExecutor): Boolean = {
@@ -325,78 +644,107 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     * @param browser the browser to interact with.
     */
   override def doBeforeExtractAction(browser: MaeveBrowser): Unit = {
-    waitForData(browser)
-  }
-
-  /**
-    * Blocks until the JavaScript-driven list widget has finished loading and actually rendered its records with
-    * their data bound. Readiness is gated on the ArcGIS 'jimu-secondary-loading' spinner disappearing, at least
-    * one row being present, and no row still showing an unbound {TEMPLATE} expression. Without this the extractor
-    * can run against a still-loading DOM (empty, or rows showing {PLACE_NAME} etc.). A timeout throws so that
-    * MaeveDriver's retry/refresh logic reacts instead of silently extracting nothing.
-    *
-    * @param browser the browser to interact with.
-    */
-  private def waitForData(browser: MaeveBrowser): Unit = {
+    if (state.complete) {
+      return
+    }
     val js = browser.asInstanceOf[JavascriptExecutor]
-    val deadline = System.currentTimeMillis() + maxWaitMs
 
-    var ready = false
-    while (!ready && System.currentTimeMillis() < deadline) {
-      if (!isLoading(js) && renderedRowCount(js) > 0 && !hasUnboundTemplates(js)) {
-        ready = true
-      } else {
-        Thread.sleep(pollIntervalMs)
-      }
+    waitForData(browser)
+
+    if (!scrollToIndex(browser)) {
+      state.complete = true
+      logger.info("Reached end of place-name list after {} records", Integer.valueOf(state.currentIndex))
+      return
     }
 
-    if (!ready) {
-      throw new IllegalStateException(
-        s"Place-name list ('$listSelector') did not finish loading within ${maxWaitMs}ms")
+    if (!openAndVerify(browser, js, state.currentIndex)) {
+      state.complete = true
+      logger.warn("Could not open the detail page for row {}; stopping", Integer.valueOf(state.currentIndex))
+      return
     }
-    logger.info("Place-name list finished loading and rendered bound rows")
   }
 
   /**
     * @return true while the ArcGIS Experience app is still showing its loading spinner.
     */
   private def isLoading(js: JavascriptExecutor): Boolean = {
-    val result = js.executeScript(
-      "return document.querySelectorAll(arguments[0]).length;",
-      loadingSelector)
-    result match {
+    js.executeScript("return document.querySelectorAll(arguments[0]).length;", loadingSelector) match {
       case n: java.lang.Number => n.longValue() > 0
       case _ => false
     }
   }
 
-  /**
-    * @return the number of list rows currently rendered in the virtualised list. Zero means the list widget has
-    *         rendered its chrome (toolbar, search) but not yet any record rows.
-    */
   private def renderedRowCount(js: JavascriptExecutor): Long = {
-    val result = js.executeScript(
+    js.executeScript(
       "return document.querySelectorAll(arguments[0] + ' div[data-react-window-index]').length;",
-      listSelector)
-    result match {
+      listSelector) match {
       case n: java.lang.Number => n.longValue()
       case _ => 0L
     }
   }
 
   /**
-    * @return true while any currently rendered row still shows an unbound {TEMPLATE} expression, i.e. the JS app
-    *         has injected the row markup but not yet resolved the record's field values.
-    */
-  private def hasUnboundTemplates(js: JavascriptExecutor): Boolean = {
-    val result = js.executeScript(
-      "var els = document.querySelectorAll(arguments[0] + ' div[data-testid=\"rich-displayer\"]');" +
-        "for (var i = 0; i < els.length; i++) { if (/\\{[A-Z0-9_]+\\}/.test(els[i].textContent)) { return true; } }" +
-        "return false;",
-      listSelector)
-    result match {
-      case b: java.lang.Boolean => b.booleanValue()
-      case _ => false
+   * @return the (react-window index, place-name) of every results-list row currently rendered, read from a single
+   *         DOM snapshot. Used to re-locate our position after the list re-renders.
+   */
+  private def renderedRows(browser: MaeveBrowser): Seq[(Int, String)] = {
+    val doc = browser.getPageAsDom
+    val rows = xpath.evaluate(s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index]", doc, XPathConstants.NODESET).asInstanceOf[NodeList]
+    (0 until rows.getLength).flatMap { i =>
+      val row = rows.item(i)
+      val idx = Option(row.getAttributes).flatMap(a => Option(a.getNamedItem("data-react-window-index")))
+        .map(_.getNodeValue).flatMap(_.toIntOption)
+      val names = xpath.evaluate(".//div[@data-layoutitemid='1']//div[@data-testid='rich-displayer']", row, XPathConstants.NODESET).asInstanceOf[NodeList]
+      val name = if (names.getLength > 0) names.item(0).getTextContent.trim else ""
+      idx.map(_ -> name)
+    }
+  }
+
+  /**
+   * Re-aligns [[state.currentIndex]] after returning to the (possibly re-rendered) search list. Scrolls the row we
+   * just read back into view and re-locates the just-read place-name, then continues from the row immediately after
+   * it. This anchors the index to the live list, so a record removed on reload (the one just read, or an earlier
+   * one) shifts our position rather than causing a skipped or duplicated record. Falls back to a plain advance when
+   * there is nothing to match against.
+   */
+  private def resyncIndex(browser: MaeveBrowser): Unit = {
+    val expectedIndex = state.currentIndex
+
+    // Bring the just-read row (and its neighbours) back into the rendered window so their names can be compared.
+    scrollToIndex(browser)
+
+    if (lastProcessedName.isEmpty) {
+      logger.warn(s"Resync has no just-read place-name to match against at index $expectedIndex; advancing to ${expectedIndex + 1}")
+      state.currentIndex = expectedIndex + 1
+      return
+    }
+
+    val matches = renderedRows(browser).collect {
+      case (i, n) if n.nonEmpty && !isUnbound(n) && namesMatch(lastProcessedName, n) => i
+    }
+
+    matches.sortBy(i => math.abs(i - expectedIndex)).headOption match {
+      case Some(found) =>
+        if (found != expectedIndex) {
+          logger.info(s"Resynced after reload: '$lastProcessedName' now at index $found (was $expectedIndex); " +
+            s"continuing from ${found + 1}")
+        }
+        state.currentIndex = found + 1
+      case None =>
+        val here = getBoundRowName(browser, expectedIndex).getOrElse("")
+        if (here.nonEmpty && namesMatch(lastProcessedName, here)) {
+          // renderedRows missed it (e.g. a row transiently unbound during the snapshot) but the slot still holds it.
+          logger.info(s"Resync: '$lastProcessedName' still at index $expectedIndex; continuing from ${expectedIndex + 1}")
+          state.currentIndex = expectedIndex + 1
+        } else if (here.isEmpty) {
+          logger.warn(s"Resync could not find or confirm '$lastProcessedName' near index $expectedIndex " +
+            s"(row not rendered/bound); advancing to ${expectedIndex + 1}")
+          state.currentIndex = expectedIndex + 1
+        } else {
+          logger.warn(s"Resync: just-read '$lastProcessedName' is no longer in the list near index $expectedIndex " +
+            s"(row now shows '$here'); treating it as removed and continuing from that record")
+          state.currentIndex = expectedIndex // the next record has slid into this slot
+        }
     }
   }
 
@@ -410,51 +758,20 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     * @param browser the browser to interact with.
     */
   override def doAfterExtractAction(browser: MaeveBrowser): Unit = {
-    val js = browser.asInstanceOf[JavascriptExecutor]
-    val previousHeight = state.lastScrollHeight
-
-    scrollDown(js)
-    Thread.sleep(timeInMS) // allow the list to lazily fetch the next batch of records and re-render
-
-    val (atBottom, scrollHeight) = scrollMetrics(js)
-    state.lastScrollHeight = scrollHeight
-    if (atBottom && scrollHeight <= previousHeight) {
-      state.complete = true
-      logger.info("Reached end of place-name list; {} unique rows captured", Integer.valueOf(state.seen.size))
+    if (state.complete) {
+      return
     }
-  }
+    goBackToList(browser)
 
-  /**
-    * Scrolls the virtualised list container down by one viewport, overlapping one row so no record is skipped.
-    */
-  private def scrollDown(js: JavascriptExecutor): Unit = {
-    js.executeScript(
-      "var c = document.querySelector(arguments[0]);" +
-        "if (c) { c.scrollTop = c.scrollTop + Math.max(1, c.clientHeight - arguments[1]); }",
-      SCROLL_SELECTOR_JS, java.lang.Long.valueOf(rowOverlapPx))
-  }
+    // The search list can re-render when we return to it; if the record we just read (or one before it) was dropped,
+    // react-window indices shift. Re-locate the just-read place-name and continue from the row after it, so the index
+    // stays aligned to the live list rather than to a stale running count.
+    resyncIndex(browser)
 
-  /**
-    * @return whether the list container is scrolled to the bottom, and its current total scroll height.
-    */
-  private def scrollMetrics(js: JavascriptExecutor): (Boolean, Long) = {
-    js.executeScript(
-      "var c = document.querySelector(arguments[0]);" +
-        "if (!c) { return null; }" +
-        "return {atBottom: (c.scrollTop + c.clientHeight) >= (c.scrollHeight - 2), scrollHeight: c.scrollHeight};",
-      SCROLL_SELECTOR_JS) match {
-      case m: java.util.Map[_, _] =>
-        val jm = m.asInstanceOf[java.util.Map[String, AnyRef]]
-        val atBottom = jm.get("atBottom") match {
-          case b: java.lang.Boolean => b.booleanValue()
-          case _ => false
-        }
-        val height = jm.get("scrollHeight") match {
-          case n: java.lang.Number => n.longValue()
-          case _ => -1L
-        }
-        (atBottom, height)
-      case _ => (true, -1L)
+    if (reloadEvery > 0 && state.currentIndex % reloadEvery == 0) {
+      logger.info("Reloading the page after {} records to reset renderer memory", Integer.valueOf(state.currentIndex))
+      browser.navigate().refresh()
+      waitForList(browser)
     }
   }
 

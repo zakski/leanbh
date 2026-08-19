@@ -15,10 +15,10 @@
 // limitations under the License.
 package com.szadowsz.maeve.core.browser
 
+import org.jsoup.Jsoup
+import org.jsoup.helper.W3CDom
 import org.openqa.selenium.chrome.ChromeDriver
 import org.w3c.{dom => w3c}
-
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
   * This is an extension to the Chrome Driver to bring it under the Maeve Browser Umbrella. It basically provides the additional page options that we require
@@ -28,12 +28,14 @@ import javax.xml.parsers.DocumentBuilderFactory
   * Created on 16/10/2016.
   */
 class MaeveRemoteBrowser(private val conf: MaeveConf) extends ChromeDriver(conf.buildChromeProfile) with MaeveBrowser {
-  private lazy val docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+  // Jsoup leniently parses the live (typically non well-formed) page source; the result is then converted to a W3C
+  // DOM. Namespace awareness is disabled so plain, un-prefixed XPath (e.g. //div[...]) matches the HTML elements.
+  private val w3cDom = new W3CDom().namespaceAware(false)
 
   /**
     * Get the currently accessed web page as Jsoup Document.
     *
     * @return A HTML document.
     */
-  override def getPageAsDom: w3c.Document =  docBuilder.parse(getPageSource)
+  override def getPageAsDom: w3c.Document = w3cDom.fromJsoup(Jsoup.parse(getPageSource))
 }
