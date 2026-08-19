@@ -71,11 +71,13 @@ object PlacenamesNiScraper {
     enableChromeDriver()
     val scraper = new MaeveDriver(conf)
     scraper.setRecoveryDirectory("./recovery/")
-    val listState = new PlacenamesNiListState()
+    val dataPath = "./data/web/placenamesNI/"
+    val listState = new PlacenamesNiListState(dataPath + "placenamesNI.csv")
     val filter = new PlacenamesNiEndlessPageExtractor(listState)
-    val actions = new PlacenamesNiEndlessPageExecutor(2000, listState) // try not throttle the website
+    // Pacing: 3s page settle + 1s pause before opening each record, so we do not hammer the site.
+    val actions = new PlacenamesNiEndlessPageExecutor(3000, 1000, listState)
 
-    val instruction1 = MaeveInstruction("placenamesNI", target, actions, filter, "./data/web/placenamesNI/", isHeadless = false, recovEnabled = true)
+    val instruction1 = MaeveInstruction("placenamesNI", target, actions, filter, dataPath, isHeadless = false, recovEnabled = true)
 
 
     scraper.feedInstruction(instruction1)
