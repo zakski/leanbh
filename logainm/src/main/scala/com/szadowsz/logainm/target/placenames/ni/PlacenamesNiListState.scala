@@ -50,11 +50,19 @@ final class PlacenamesNiListState(csvFile: String) {
   /** total scroll height observed on the previous scroll step, used to detect when lazy loading has finished. */
   var lastScrollHeight: Long = -1L
 
+  /**
+   * place-name of the record currently being processed, read from the (clean, county-suffix-free) search-list row by
+   * the executor when it opens the record. The extractor writes this as the record's name rather than re-deriving it
+   * from the detail page's title (which carries a trailing ", County ..." suffix).
+   */
+  var currentListName: String = ""
+
 
   /**
-   * Reads the CSV, returning the place-name of every record in order. The place-name is the first column with any
-   * trailing ", County ..." suffix stripped, matching the leading name shown in the search list. Parsing is
-   * tolerant of a partially written final row (e.g. after a crash).
+   * Reads the CSV, returning the place-name of every record in order. The place-name is the second column (column 0
+   * is the Townland); it is the clean, county-suffix-free name written from the search-list row, so it matches the
+   * leading name shown in the list when resuming. Parsing is tolerant of a partially written final row (e.g. after a
+   * crash) and of an older single-column-name layout.
    */
   private def loadWrittenNames(): ListBuffer[String] = {
     val file = new File(csvFile)
@@ -72,7 +80,11 @@ final class PlacenamesNiListState(csvFile: String) {
         var row = reader.read()
         while (row != null) {
           read += 1
-          val title = if (row.size() == 0) "" else Option(row.get(0)).getOrElse("")
+          // Place-name is column 1 (column 0 is the Townland). Fall back to column 0 for a truncated/legacy row.
+          val title =
+            if (row.size() > 1) Option(row.get(1)).getOrElse("")
+            else if (row.size() == 1) Option(row.get(0)).getOrElse("")
+            else ""
           names += title
           row = reader.read()
         }

@@ -16,14 +16,13 @@
 package com.szadowsz.logainm.target.placenames.ni
 
 import com.szadowsz.common.net.Uri
-import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExecutor.{PLACENAME_DETAIL_MARKER, PLACENAME_LIST_MARKER, PLACENAME_SCROLL_STEP_PX, PLACENAME_SCROLL_STEP_ROWS, RESULTS_SCROLL_XPATH, SCROLL_SELECTOR_JS}
+import com.szadowsz.logainm.target.placenames.ni.PlacenamesNiEndlessPageExecutor.{PLACENAME_DETAIL_MARKER, PLACENAME_LIST_MARKER, PLACENAME_SCROLL_STEP_PX, PLACENAME_SCROLL_STEP_ROWS, SCROLL_SELECTOR_JS, SCROLL_SELECTOR_NAME}
 import com.szadowsz.maeve.core.browser.MaeveBrowser
 import com.szadowsz.maeve.core.instruction.actions.ActionExecutor
 import org.openqa.selenium.JavascriptExecutor
 import org.slf4j.LoggerFactory
-import org.w3c.dom.{Node, NodeList}
 
-import javax.xml.xpath.{XPathConstants, XPathFactory}
+import scala.jdk.CollectionConverters.ListHasAsScala
 
 
 object PlacenamesNiEndlessPageExecutor {
@@ -34,7 +33,7 @@ object PlacenamesNiEndlessPageExecutor {
 
   val PLACENAME_ROW_HEIGHT_PX = 71L // Nominal row height of the search list. Rows can vary in height, this is standard
 
-  val PLACENAME_SCROLL_STEP_ROWS = 5 // How far to advance the scroll in rows. Kept below a viewport of rows.
+  val PLACENAME_SCROLL_STEP_ROWS = 8 // How far to advance the scroll in rows. Kept below a viewport of rows so the downward crawl never jumps past (and misses) a target row.
 
   val PLACENAME_SCROLL_STEP_PX = PLACENAME_ROW_HEIGHT_PX * PLACENAME_SCROLL_STEP_ROWS // How far to advance the scroll. Kept below a viewport of rows.
 
@@ -43,12 +42,6 @@ object PlacenamesNiEndlessPageExecutor {
   private val SCROLL_SELECTOR_NAME = "div.widget-list-list"
 
   private val SCROLL_SELECTOR_JS = RESULTS_LIST_SELECTOR + " " + SCROLL_SELECTOR_NAME
-
-  // XPath (for the w3c DOM returned by getPageAsDom) locating the results scroll container, scoped to the results
-  // list widget (widget_895) so the separate Historical Forms list widget on the same page is never matched.
-  val RESULTS_SCROLL_XPATH: String =
-    "//div[contains(concat(' ', normalize-space(@class), ' '), ' list-widget-widget_895 ')]" +
-      "//div[contains(concat(' ', normalize-space(@class), ' '), ' widget-list-list ')]"
 
 }
 
@@ -73,8 +66,6 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
 
   // The ArcGIS Experience list widget container that holds the rendered place-name records.
   private val listSelector = "div[class=\"widget-list d-flex\"]"
-  // The virtualised (react-window) scroll container inside the list widget.
-  private val scrollSelector = "div.widget-list-list"
   // Spinner the ArcGIS Experience app shows while it is still fetching / rendering the list.
   private val loadingSelector = "div.jimu-secondary-loading"
   // Overlap one row height between scroll steps so react-window virtualisation can never skip a record.
@@ -82,8 +73,9 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
   // Total time we are prepared to wait for the JS app to finish rendering the list.
   private val maxWaitMs = math.max(timeInMS * 15, 30000L)
   private val pollIntervalMs = 500L
-  // Reused to evaluate XPath against the w3c DOM snapshot returned by getPageAsDom (single-threaded crawl).
-  private val xpath = XPathFactory.newInstance().newXPath()
+  // Shorter settle taken between scroll steps: after a scroll we only need react-window to render the new window (and,
+  // if it appears, the lazy-load spinner to be picked up) - not the full page-load poll. Speeds up long scrolls.
+  private val scrollSettleMs = 200L
   // Scroll position of the results list when the current record was opened, restored after returning from its detail
   // page so the crawl does not have to re-scroll from the top for every record.
   private var lastListScrollTop = 0L
@@ -95,18 +87,6 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
   // observed to crash around 900 records of client-side list<->detail navigation). Set to 0 to disable.
   private val reloadEvery = 150
 
-
-  /**
-   * Evaluates the given XPath against the current page's w3c DOM (getPageAsDom) and returns the matched nodes.
-   *
-   * @param browser    the browser whose current page DOM is queried.
-   * @param expression the XPath expression to evaluate.
-   * @return the matched nodes in document order (empty if none match).
-   */
-  private def selectNodes(browser: MaeveBrowser, expression: String): Seq[Node] = {
-    val nodes = xpath.evaluate(expression, browser.getPageAsDom, XPathConstants.NODESET).asInstanceOf[NodeList]
-    (0 until nodes.getLength).map(nodes.item)
-  }
 
   /**
    * @return true if the row at the given index is currently marked selected (aria-selected="true").
@@ -122,7 +102,13 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
   }
 
   private def isRowPresent(browser: MaeveBrowser, index: Int): Boolean = {
-    selectNodes(browser, s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index='$index']").nonEmpty
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    js.executeScript(
+      "return document.querySelector(arguments[0]) != null;",
+      SCROLL_SELECTOR_JS + " div[data-react-window-index='" + index + "']") match {
+      case b: java.lang.Boolean => b.booleanValue()
+      case _ => false
+    }
   }
 
   /**
@@ -137,7 +123,18 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    *         in its leading cell, i.e. the record data has not been populated yet.
    */
   private def hasUnboundRows(browser: MaeveBrowser): Boolean = {
-    selectNodes(browser, s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index]").map(_.getTextContent.trim).exists(isUnbound)
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    js.executeScript(
+      "var rows = document.querySelectorAll(arguments[0] + ' div[data-react-window-index]');" +
+        "for (var i = 0; i < rows.length; i++) {" +
+        "  var t = rows[i].textContent || '';" +
+        "  if (t.indexOf('{') !== -1 && t.indexOf('}') !== -1) { return true; }" +
+        "}" +
+        "return false;",
+      SCROLL_SELECTOR_JS) match {
+      case b: java.lang.Boolean => b.booleanValue()
+      case _ => false
+    }
   }
 
   /**
@@ -168,10 +165,16 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    * @return the row's place-name text, or None if the row is not currently rendered.
    */
   private def getRowName(browser: MaeveBrowser, index: Int): Option[String] = {
-    selectNodes(browser,
-      s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index='$index']//div[@data-layoutitemid='1']//div[@data-testid='rich-displayer']")
-      .headOption
-      .map(_.getTextContent.trim)
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    js.executeScript(
+      "var row = document.querySelector(arguments[0]); if (!row) { return null; }" +
+        "var cell = row.querySelector(\"div[data-layoutitemid='1'] div[data-testid='rich-displayer']\");" +
+        "if (!cell) { cell = row.querySelector(\"div[data-testid='rich-displayer']\"); }" +
+        "return cell ? (cell.textContent || '') : '';",
+      SCROLL_SELECTOR_JS + " div[data-react-window-index='" + index + "']") match {
+      case s: String => Some(s.trim)
+      case _ => None
+    }
   }
 
   /**
@@ -274,15 +277,29 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
 
 
   /**
-   * Blocks until the detail page is loaded and its record fields are bound. Throws on timeout.
+   * Blocks until the detail page is loaded and its record fields are bound. Because the ArcGIS Experience app swaps the
+   * detail content in asynchronously (the URL fragment and the bound fields can flip to "ready" a beat before the app
+   * has actually finished re-rendering the record), readiness is double-checked: the "loaded" condition must hold on two
+   * consecutive polls (pollIntervalMs apart) before we treat the detail page as settled. Throws on timeout.
    */
   private def waitForDetailPage(browser: MaeveBrowser): Unit = {
     val js = browser.asInstanceOf[JavascriptExecutor]
     val deadline = System.currentTimeMillis() + maxWaitMs
-    while (System.currentTimeMillis() < deadline && !(urlContains(browser, PLACENAME_DETAIL_MARKER) && detailBound(js))) {
-      Thread.sleep(pollIntervalMs)
+
+    def loaded: Boolean = urlContains(browser, PLACENAME_DETAIL_MARKER) && detailBound(js)
+
+    var confirmations = 0
+    while (confirmations < 2 && System.currentTimeMillis() < deadline) {
+      if (loaded) {
+        confirmations += 1
+      } else {
+        confirmations = 0
+      }
+      if (confirmations < 2) {
+        Thread.sleep(pollIntervalMs)
+      }
     }
-    if (!(urlContains(browser, PLACENAME_DETAIL_MARKER) && detailBound(js))) {
+    if (confirmations < 2) {
       throw new IllegalStateException(s"Place-Name-Info detail page did not load within ${maxWaitMs}ms")
     }
   }
@@ -294,7 +311,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     js.executeScript(
       "var c = document.querySelector(arguments[0]);" +
         "if (c) { c.scrollTop = c.scrollTop + Math.max(1, c.clientHeight - arguments[1]); }",
-      scrollSelector, java.lang.Long.valueOf(rowOverlapPx))
+      SCROLL_SELECTOR_NAME, java.lang.Long.valueOf(rowOverlapPx))
   }
 
   /**
@@ -305,7 +322,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
       "var c = document.querySelector(arguments[0]);" +
         "if (!c) { return null; }" +
         "return {atBottom: (c.scrollTop + c.clientHeight) >= (c.scrollHeight - 2), scrollHeight: c.scrollHeight};",
-      scrollSelector) match {
+      SCROLL_SELECTOR_NAME) match {
       case m: java.util.Map[_, _] =>
         val jm = m.asInstanceOf[java.util.Map[String, AnyRef]]
         val atBottom = jm.get("atBottom") match {
@@ -383,6 +400,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
           if (namesMatch(expected, shown)) {
             logger.info("Opened detail page '{}' for row {}", shown, Integer.valueOf(index))
             lastProcessedName = expected // remembered so we can re-locate our position after returning to the list
+            state.currentListName = expected // the clean list-page name the extractor writes (no county suffix)
             return true // confirmed correct record; leave the browser here for the extractor
           }
           logger.warn("'More Info' opened the wrong record for row {} (expected '{}' but detail shows '{}'); recovering",
@@ -411,7 +429,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    * @return true if the row was selected and its "More Info" clicked; false if the elements were not found.
    */
   private def openRow(js: JavascriptExecutor, index: Int): Boolean = {
-    val rowSelector = scrollSelector + " div[data-react-window-index='" + index + "']"
+    val rowSelector = SCROLL_SELECTOR_NAME + " div[data-react-window-index='" + index + "']"
     // Select the row so it becomes the widget's current feature.
     if (!clickElement(js, rowSelector + " div[role='option']")) {
       return false
@@ -456,10 +474,11 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     if (isRowPresent(browser, index)) {
       return true // already rendered (the list often keeps its position after returning from a detail page)
     }
-    // Scale the deadline with the distance: each scroll step can cost a poll plus a lazy-load wait, so allow one
-    // per row-step needed to reach the index, with maxWaitMs as a floor for short scrolls.
+    // Scale the deadline with the distance: reaching the index takes (index / rows-per-step) scroll steps, and each
+    // step can cost a short settle plus, occasionally, a full lazy-load wait - so budget that worst case per step,
+    // with maxWaitMs as a floor for short scrolls.
     val stepRows = math.max(1L, PLACENAME_SCROLL_STEP_ROWS)
-    val perStepMs = pollIntervalMs + math.max(timeInMS, 3000L)
+    val perStepMs = scrollSettleMs + math.max(timeInMS, 3000L)
     val budgetMs = math.max(maxWaitMs, (index.toLong / stepRows + 1L) * perStepMs)
     logger.info("Scrolling to row {}, budget {}ms", Integer.valueOf(index), java.lang.Long.valueOf(budgetMs))
     val deadline = System.currentTimeMillis() + budgetMs
@@ -469,14 +488,16 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     // rows) until the row's react-window element renders, or we are clamped at the bottom of the list.
     while (System.currentTimeMillis() < deadline) {
       setScrollTop(js, getScrollTop(js) + PLACENAME_SCROLL_STEP_PX)
-      waitForList(browser) // let any lazily loaded records arrive before checking again
-      Thread.sleep(pollIntervalMs)
+      waitForRowsBound(browser) // let react-window render / any lazily loaded records bind before checking again
+      Thread.sleep(scrollSettleMs)
       if (isRowPresent(browser, index)) {
         logger.info("Found Row, Stopping Scrolling")
         return true
       }
       val top = getScrollTop(js)
-      if (atListBottom(js) && top == lastTop) {
+      // Only count towards "end of list" when we are clamped at the bottom, made no progress, AND the app is not
+      // mid lazy-load - so the shortened settle cannot mistake an in-flight fetch for the true end of the list.
+      if (atListBottom(js) && top == lastTop && !isLoading(js)) {
         endChecks += 1
         if (endChecks >= 3) {
           logger.info("Did Not Find Row, Stopping Scrolling")
@@ -497,7 +518,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
    * @return true if the button was found and clicked.
    */
   private def clickMoreInfo(js: JavascriptExecutor, index: Int): Boolean = {
-    clickElement(js, scrollSelector + " div[data-react-window-index='" + index + "'] a[aria-label='More Info']")
+    clickElement(js, SCROLL_SELECTOR_NAME + " div[data-react-window-index='" + index + "'] a[aria-label='More Info']")
   }
 
   /**
@@ -569,7 +590,7 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
     setScrollTop(js, 0L)
     waitForRowsBound(browser)
 
-    val perStepMs = pollIntervalMs + math.max(timeInMS, 3000L)
+    val perStepMs = scrollSettleMs + math.max(timeInMS, 3000L)
     val budgetMs = math.max(maxWaitMs, (state.getWrittenCount().toLong / PLACENAME_SCROLL_STEP_ROWS + 1L) * perStepMs)
     val deadline = System.currentTimeMillis() + budgetMs
 
@@ -581,8 +602,8 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
         val before = getScrollTop(js)
         setScrollTop(js, before + PLACENAME_SCROLL_STEP_PX)
         waitForRowsBound(browser)
-        Thread.sleep(pollIntervalMs)
-        if (!isRowPresent(browser, idx) && atListBottom(js) && getScrollTop(js) == before) {
+        Thread.sleep(scrollSettleMs)
+        if (!isRowPresent(browser, idx) && atListBottom(js) && getScrollTop(js) == before && !isLoading(js)) {
           endChecks += 1
           if (endChecks >= 3) {
             throw new IllegalStateException(
@@ -685,18 +706,31 @@ final class PlacenamesNiEndlessPageExecutor(timeInMS : Long, throttleMs : Long, 
 
   /**
    * @return the (react-window index, place-name) of every results-list row currently rendered, read from a single
-   *         DOM snapshot. Used to re-locate our position after the list re-renders.
+   *         live-DOM snapshot. Used to re-locate our position after the list re-renders.
    */
   private def renderedRows(browser: MaeveBrowser): Seq[(Int, String)] = {
-    val doc = browser.getPageAsDom
-    val rows = xpath.evaluate(s"$RESULTS_SCROLL_XPATH//div[@data-react-window-index]", doc, XPathConstants.NODESET).asInstanceOf[NodeList]
-    (0 until rows.getLength).flatMap { i =>
-      val row = rows.item(i)
-      val idx = Option(row.getAttributes).flatMap(a => Option(a.getNamedItem("data-react-window-index")))
-        .map(_.getNodeValue).flatMap(_.toIntOption)
-      val names = xpath.evaluate(".//div[@data-layoutitemid='1']//div[@data-testid='rich-displayer']", row, XPathConstants.NODESET).asInstanceOf[NodeList]
-      val name = if (names.getLength > 0) names.item(0).getTextContent.trim else ""
-      idx.map(_ -> name)
+    val js = browser.asInstanceOf[JavascriptExecutor]
+    js.executeScript(
+      "var rows = document.querySelectorAll(arguments[0] + ' div[data-react-window-index]');" +
+        "var out = [];" +
+        "for (var i = 0; i < rows.length; i++) {" +
+        "  var idx = rows[i].getAttribute('data-react-window-index');" +
+        "  var cell = rows[i].querySelector(\"div[data-layoutitemid='1'] div[data-testid='rich-displayer']\");" +
+        "  if (!cell) { cell = rows[i].querySelector(\"div[data-testid='rich-displayer']\"); }" +
+        "  var name = cell ? (cell.textContent || '') : '';" +
+        "  out.push([idx, name]);" +
+        "}" +
+        "return out;",
+      SCROLL_SELECTOR_JS) match {
+      case list: java.util.List[_] =>
+        list.asScala.toSeq.flatMap {
+          case pair: java.util.List[_] if pair.size() >= 2 =>
+            val idx = Option(pair.get(0)).map(_.toString).flatMap(_.toIntOption)
+            val name = Option(pair.get(1)).map(_.toString.trim).getOrElse("")
+            idx.map(_ -> name)
+          case _ => None
+        }
+      case _ => Seq.empty
     }
   }
 

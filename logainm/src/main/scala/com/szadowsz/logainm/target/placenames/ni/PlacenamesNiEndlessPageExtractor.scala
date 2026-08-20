@@ -95,17 +95,22 @@ class PlacenamesNiEndlessPageExtractor(state: PlacenamesNiListState) extends Jso
       return
     }
 
-    val title = PlacenamesNiEndlessPageExtractor.getTitle(page)
+    // Prefer the clean search-list name the executor captured (no trailing ", County ..." suffix); fall back to the
+    // detail page's own title only if the list name is unavailable.
+    val listName = state.currentListName.trim
+    val title = if (listName.nonEmpty) listName else PlacenamesNiEndlessPageExtractor.getTitle(page)
     if (!state.markWritten(state.currentIndex, title)) {
       logger.warn("Skipping write for index {} ('{}'): already written this run/resume (no CSV line appended)",
         Integer.valueOf(state.currentIndex), title)
       return
     } // already written (retry / resume) - do not duplicate
 
-    val fields = LABELS.map(label => PlacenamesNiEndlessPageExtractor.getField(page, label))
+    val townland = PlacenamesNiEndlessPageExtractor.getField(page, "Townland")
+    // Townland leads the row (the remaining detail fields keep their LABELS order, minus the now-promoted Townland).
+    val fields = LABELS.filterNot(_ == "Townland").map(label => PlacenamesNiEndlessPageExtractor.getField(page, label))
     val historical = PlacenamesNiEndlessPageExtractor.getHistoricalForms(page)
 
-    val row: Seq[String] = (title +: fields) :+ historical
+    val row: Seq[String] = (townland +: title +: fields) :+ historical
 
     val csvPath = inst.dPath + s"${inst.name}.csv"
     val writer = new CsvWriter(csvPath, "UTF-8", true)

@@ -74,8 +74,8 @@ object PlacenamesNiScraper {
     val dataPath = "./data/web/placenamesNI/"
     val listState = new PlacenamesNiListState(dataPath + "placenamesNI.csv")
     val filter = new PlacenamesNiEndlessPageExtractor(listState)
-    // Pacing: 3s page settle + 1s pause before opening each record, so we do not hammer the site.
-    val actions = new PlacenamesNiEndlessPageExecutor(3000, 1000, listState)
+    // Pacing: 2s page settle + ~0.67s pause before opening each record (both reduced by a third), so we do not hammer the site.
+    val actions = new PlacenamesNiEndlessPageExecutor(2000, 667, listState)
 
     val instruction1 = MaeveInstruction("placenamesNI", target, actions, filter, dataPath, isHeadless = false, recovEnabled = true)
 
